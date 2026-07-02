@@ -1,9 +1,8 @@
 export const config = {
-    runtime: 'edge', // Shifts execution to the high-reliability global Edge Network
+    runtime: 'edge', 
 };
 
 export default async function handler(req) {
-    // Only allow POST requests
     if (req.method !== 'POST') {
         return new Response(JSON.stringify({ error: 'Method not allowed' }), {
             status: 405,
@@ -12,12 +11,25 @@ export default async function handler(req) {
     }
 
     try {
-        const { tlName, eventName, code } = await req.json();
+        // Safe Request Extraction Fallback Layer
+        let tlName = "Not Provided";
+        let eventName = "Not Provided";
+        let code = "000000";
+
+        try {
+            const body = await req.json();
+            if (body) {
+                tlName = body.tlName || tlName;
+                eventName = body.eventName || eventName;
+                code = body.code || code;
+            }
+        } catch (parseError) {
+            console.warn("Incoming stream parse warning, falling back to defaults.");
+        }
 
         const token = process.env.TELEGRAM_BOT_TOKEN;
         const chatId = process.env.TELEGRAM_CHAT_ID;
 
-        // Catch missing variables before executing network actions
         if (!token || !chatId) {
             return new Response(JSON.stringify({ error: 'Environment variables are missing on Vercel.' }), {
                 status: 500,
@@ -33,7 +45,6 @@ export default async function handler(req) {
 
         const telegramUrl = `https://api.telegram.org/bot${token}/sendMessage`;
 
-        // Execute the dispatch request explicitly using web standard streams
         const telegramResponse = await fetch(telegramUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -52,14 +63,14 @@ export default async function handler(req) {
                 headers: { 'Content-Type': 'application/json' }
             });
         } else {
-            return new Response(JSON.stringify({ error: 'Telegram API rejected message request.', details: telegramData }), {
+            return new Response(JSON.stringify({ error: 'Telegram API rejected request.', details: telegramData }), {
                 status: 400,
                 headers: { 'Content-Type': 'application/json' }
             });
         }
 
     } catch (err) {
-        return new Response(JSON.stringify({ error: 'Internal system execution catch block triggered.', details: err.message }), {
+        return new Response(JSON.stringify({ error: 'System execution failure.', details: err.message }), {
             status: 500,
             headers: { 'Content-Type': 'application/json' }
         });
