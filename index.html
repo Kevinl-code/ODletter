@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>On-Duty Request Letter Generator & Verifier</title>
+
+<style>
+/* App Layout Wrapper */
+.app-wrapper {
+    display: flex;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f4f6f9;
+    min-height: 100vh;
+}
+
+/* Control Panel / Form Styling */
+.control-panel {
+    width: 35%;
+    padding: 25px;
+    background-color: #ffffff;
+    box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+    box-sizing: border-box;
+    overflow-y: auto;
+    max-height: 100vh;
+}
+
+.control-panel h2 {
+    color: #2c3e50;
+    margin-top: 0;
+    border-bottom: 2px solid #3498db;
+    padding-bottom: 10px;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 5px;
+    color: #34495e;
+    font-size: 0.95rem;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box;
+    font-size: 0.95rem;
+}
+
+.student-entry {
+    background: #f8f9fa;
+    border: 1px dashed #bdc3c7;
+    padding: 10px;
+    margin-bottom: 10px;
+    border-radius: 4px;
+}
+
+.btn {
+    background-color: #3498db;
+    color: white;
+    padding: 12px 15px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    width: 100%;
+    margin-top: 10px;
+    font-size: 1rem;
+}
+
+.btn:hover {
+    background-color: #2980b9;
+}
+
+.btn-add-student {
+    background-color: #2ecc71;
+    margin-bottom: 15px;
+    padding: 8px 12px;
+    font-size: 0.9rem;
+}
+
+.btn-add-student:hover {
+    background-color: #27ae60;
+}
+
+.btn-verify {
+    background-color: #e74c3c;
+}
+.btn-verify:hover {
+    background-color: #c0392b;
+}
+
+/* Security Overlay Blurring the Document Preview */
+.preview-panel {
+    width: 65%;
+    padding: 40px;
+    box-sizing: border-box;
+    overflow-y: auto;
+    max-height: 100vh;
+    display: flex;
+    justify-content: center;
+    background-color: #ecf0f1;
+    position: relative;
+}
+
+.letter-container {
+    width: 210mm;
+    min-height: 297mm;
+    padding: 25mm;
+    background-color: #ffffff;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    box-sizing: border-box;
+    color: #000;
+    font-family: "Times New Roman", Times, serif;
+    font-size: 12pt;
+    line-height: 1.5;
+    transition: filter 0.3s ease;
+}
+
+/* Security classes to stop screenshots or unverified views */
+.locked {
+    filter: blur(12px);
+    pointer-events: none;
+    user-select: none;
+}
+
+.security-toast {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(44, 62, 80, 0.98);
+    color: white;
+    padding: 30px;
+    border-radius: 8px;
+    text-align: center;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+    z-index: 10;
+    width: 340px;
+}
+
+.security-toast input {
+    width: 80%;
+    padding: 10px;
+    margin: 15px 0;
+    text-align: center;
+    font-size: 1.25rem;
+    letter-spacing: 5px;
+    border: none;
+    border-radius: 4px;
+    color: #000;
+}
+
+/* Print Layout Specifications */
+.right { text-align: right; }
+.left { text-align: left; }
+.subject { font-weight: bold; margin-top: 20px; margin-bottom: 20px; }
+.content { text-align: justify; text-indent: 40px; }
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+    margin-bottom: 20px;
+}
+
+table th, table td {
+    border: 1px solid #000;
+    padding: 8px;
+    text-align: center;
+    font-size: 12pt;
+}
+
+.closing-area {
+    margin-top: 40px;
+    float: right;
+    text-align: left;
+    padding-right: 50px;
+}
+
+@media print {
+    .control-panel, .security-toast, .no-print {
+        display: none !important;
+    }
+    .preview-panel {
+        width: 100%;
+        padding: 0;
+        background: none;
+    }
+    .letter-container {
+        box-shadow: none;
+        margin: 0;
+        width: 100%;
+        filter: none !important;
+    }
+}
+</style>
+</head>
+<body>
+
+<div class="app-wrapper">
+    
+    <!-- Left Panel: Form UI -->
+    <div class="control-panel no-print">
+        <h2>Letter Workspace</h2>
+        
+        <div class="form-group">
+            <label>Date</label>
+            <input type="date" id="input_date" oninput="updatePreview()">
+        </div>
+        
+        <div class="form-group">
+            <label>Technical Team Leader Name (You)</label>
+            <input type="text" id="input_tl_name" value="Dr. Rajesh Kumar" oninput="updatePreview()">
+        </div>
+        
+        <div class="form-group">
+            <label>Department</label>
+            <input type="text" id="input_dept" value="Computer Science and Engineering" oninput="updatePreview()">
+        </div>
+        
+        <div class="form-group">
+            <label>College/Institution Name</label>
+            <input type="text" id="input_college" value="Alpha Engineering College" oninput="updatePreview()">
+        </div>
+        
+        <div class="form-group">
+            <label>Event Name</label>
+            <input type="text" id="input_event" value="National Level Hackathon 2026" oninput="updatePreview()">
+        </div>
+        
+        <div class="form-group">
+            <label>Organizing Institution & Place</label>
+            <input type="text" id="input_organizer" value="IIT Madras, Chennai" oninput="updatePreview()">
+        </div>
+        
+        <div class="form-group">
+            <label>From Date</label>
+            <input type="date" id="input_from_date" oninput="updatePreview()">
+        </div>
+        
+        <div class="form-group">
+            <label>To Date</label>
+            <input type="date" id="input_to_date" oninput="updatePreview()">
+        </div>
+
+        <hr style="border: 0; border-top: 1px solid #ccc; margin: 20px 0;">
+        
+        <h3>Students List</h3>
+        <div id="student_inputs_container"></div>
+        <button type="button" class="btn btn-add-student" onclick="addStudentInput()">+ Add Student</button>
+        
+        <button id="action_btn" class="btn btn-verify" onclick="requestVerification()">Generate & Verify Letter</button>
+    </div>
+
+    <!-- Right Panel: Secure Document Preview -->
+    <div class="preview-panel">
+        
+        <!-- Security Notification Overlay UI -->
+        <div id="security_overlay" class="security-toast">
+            <h3>🔒 Authorization Required</h3>
+            <p style="font-size:0.9rem; color:#bdc3c7;">A validation PIN has been dispatched to the Team Leader via Telegram. Please verify identity to view or print.</p>
+            <input type="text" id="verification_pin_input" placeholder="000000" maxlength="6">
+            <button class="btn" style="margin-top:0;" onclick="checkVerificationCode()">Unlock Document</button>
+        </div>
+
+        <div id="letter_body" class="letter-container locked">
+            <div class="right" id="view_date"></div>
+            <br>
+            <div class="left">
+                <b>From</b><br>
+                <span id="view_tl_name"></span><br>
+                Technical Team Leader<br>
+                Department of <span id="view_dept_from"></span><br>
+                <span id="view_college_from"></span>
+            </div>
+            <br>
+            <div class="left">
+                <b>To</b><br>
+                The Head of the Department<br>
+                Department of <span id="view_dept_to"></span><br>
+                <span id="view_college_to"></span>
+            </div>
+
+            <div class="subject">
+                Subject: Request for Grant of On-Duty Permission for Students Participating in <span id="view_event_subj"></span>
+            </div>
+
+            <p>Respected Sir/Madam,</p>
+
+            <p class="content">
+                I respectfully submit that the following students of the Department of 
+                <span id="view_dept_body"></span> have registered to participate in 
+                <b id="view_event_body"></b> organized by 
+                <b id="view_organizer_body"></b> from 
+                <b id="view_from_date_body"></b> to 
+                <b id="view_to_date_body"></b>.
+            </p>
+            
+            <p class="content">
+                The event is of academic significance and will provide valuable exposure to the participants. Therefore, I kindly request you to grant On-Duty (OD) permission for the following students during the above mentioned period.
+            </p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 8%;">S.No</th>
+                        <th>Student Name</th>
+                        <th>Register Number</th>
+                        <th style="width: 12%;">Year</th>
+                        <th style="width: 12%;">Section</th>
+                    </tr>
+                </thead>
+                <tbody id="view_student_rows"></tbody>
+            </table>
+
+            <center><p>Thank You</p></center>
+
+            <div class="closing-area">
+                <p>Yours faithfully,</p>
+                <br><br>
+                <p><b><span id="view_tl_name_close"></span></b><br>Technical Team Leader</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let students = [{ name: 'Arun Kumar', regNo: '22CSE101', year: 'III', section: 'A' }];
+let generatedVerificationCode = null;
+let isDocumentVerified = false;
+
+function formatDateString(dateVal) {
+    if(!dateVal) return "________";
+    const dateObj = new Date(dateVal);
+    return dateObj.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function updatePreview() {
+    const date = document.getElementById('input_date').value;
+    const tlName = document.getElementById('input_tl_name').value || "___________";
+    const dept = document.getElementById('input_dept').value || "___________";
+    const college = document.getElementById('input_college').value || "___________";
+    const eventName = document.getElementById('input_event').value || "___________";
+    const organizer = document.getElementById('input_organizer').value || "___________";
+    const fromDate = document.getElementById('input_from_date').value;
+    const toDate = document.getElementById('input_to_date').value;
+
+    document.getElementById('view_date').innerText = date ? formatDateString(date) : formatDateString(new Date());
+    document.getElementById('view_tl_name').innerText = tlName;
+    document.getElementById('view_tl_name_close').innerText = tlName;
+    document.getElementById('view_dept_from').innerText = dept;
+    document.getElementById('view_dept_to').innerText = dept;
+    document.getElementById('view_dept_body').innerText = dept;
+    document.getElementById('view_college_from').innerText = college;
+    document.getElementById('view_college_to').innerText = college;
+    document.getElementById('view_event_subj').innerText = eventName;
+    document.getElementById('view_event_body').innerText = eventName;
+    document.getElementById('view_organizer_body').innerText = organizer;
+    document.getElementById('view_from_date_body').innerText = formatDateString(fromDate);
+    document.getElementById('view_to_date_body').innerText = formatDateString(toDate);
+
+    const tbody = document.getElementById('view_student_rows');
+    tbody.innerHTML = '';
+    students.forEach((student, index) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `<td>${index + 1}</td><td>${student.name || ''}</td><td>${student.regNo || ''}</td><td>${student.year || ''}</td><td>${student.section || ''}</td>`;
+        tbody.appendChild(row);
+    });
+}
+
+// Interacts with serverless proxy endpoint to hide API Keys securely
+async function requestVerification() {
+    if(isDocumentVerified) {
+        window.print();
+        return;
+    }
+
+    // Generate frontend confirmation code 
+    generatedVerificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    const tlName = document.getElementById('input_tl_name').value;
+    const eventName = document.getElementById('input_event').value;
+
+    try {
+        const response = await fetch('/api/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                tlName: tlName,
+                eventName: eventName,
+                code: generatedVerificationCode
+            })
+        });
+
+        if (response.ok) {
+            alert("Verification code securely dispatched to the Team Leader's Telegram device.");
+        } else {
+            alert("Error sending dispatch request via secure server.");
+        }
+    } catch (err) {
+        console.error(err);
+        alert("Server processing error. Ensure serverless functions are configured.");
+    }
+}
+
+function checkVerificationCode() {
+    const userEnteredPin = document.getElementById('verification_pin_input').value;
+    
+    if (userEnteredPin === generatedVerificationCode && generatedVerificationCode !== null) {
+        isDocumentVerified = true;
+        document.getElementById('letter_body').classList.remove('locked');
+        document.getElementById('security_overlay').style.display = 'none';
+        
+        const actionBtn = document.getElementById('action_btn');
+        actionBtn.innerText = "Print Document / Save PDF";
+        actionBtn.style.backgroundColor = "#2ecc71";
+        
+        alert("Identity verified successfully! Document unlocked.");
+    } else {
+        alert("Incorrect Verification Code. Access Denied.");
+    }
+}
+
+function renderStudentInputs() {
+    const container = document.getElementById('student_inputs_container');
+    container.innerHTML = '';
+    students.forEach((student, index) => {
+        const div = document.createElement('div');
+        div.className = 'student-entry';
+        div.innerHTML = `
+            <div style="font-weight:bold; margin-bottom: 5px; font-size:0.85rem; display:flex; justify-content:space-between;">
+                <span>Student #${index + 1}</span>
+                <span style="color:#e74c3c; cursor:pointer;" onclick="removeStudent(${index})">Remove</span>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom:5px;">
+                <input type="text" placeholder="Name" value="${student.name}" oninput="updateStudentData(${index}, 'name', this.value)">
+                <input type="text" placeholder="Reg No" value="${student.regNo}" oninput="updateStudentData(${index}, 'regNo', this.value)">
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px;">
+                <input type="text" placeholder="Year" value="${student.year}" oninput="updateStudentData(${index}, 'year', this.value)">
+                <input type="text" placeholder="Section" value="${student.section}" oninput="updateStudentData(${index}, 'section', this.value)">
+            </div>`;
+        container.appendChild(div);
+    });
+}
+
+function addStudentInput() { students.push({ name: '', regNo: '', year: '', section: '' }); renderStudentInputs(); updatePreview(); }
+function removeStudent(index) { students.splice(index, 1); renderStudentInputs(); updatePreview(); }
+function updateStudentData(index, field, value) { students[index][field] = value; updatePreview(); }
+
+document.getElementById('input_date').valueAsDate = new Date();
+document.getElementById('input_from_date').valueAsDate = new Date();
+document.getElementById('input_to_date').valueAsDate = new Date();
+renderStudentInputs();
+updatePreview();
+</script>
+</body>
+</html>
