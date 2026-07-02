@@ -1,27 +1,39 @@
-export default async function handler(req, res) {
+export const config = {
+    runtime: 'edge', // Shifts execution to the high-reliability global Edge Network
+};
+
+export default async function handler(req) {
+    // Only allow POST requests
     if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed' });
+        return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+            status: 405,
+            headers: { 'Content-Type': 'application/json' }
+        });
     }
-
-    const { tlName, eventName, code } = req.body;
-
-    // Pull environmental secrets securely on server side execution
-    const token = process.env.TELEGRAM_BOT_TOKEN;
-    const chatId = process.env.TELEGRAM_CHAT_ID;
-
-    if (!token || !chatId) {
-        return res.status(500).json({ error: 'Server environmental credentials configuration missing.' });
-    }
-
-    const textAlert = `🚨 *OD Letter Authorization Request*\n\n` +
-                      `👤 *Requester/TL:* ${tlName}\n` +
-                      `🏆 *Event:* ${eventName}\n` +
-                      `🔢 *Security Verification PIN:* \`${code}\` \n\n` +
-                      `If you did not request this, do not share this PIN code.`;
-
-    const telegramUrl = `https://api.telegram.org/bot${token}/sendMessage`;
 
     try {
+        const { tlName, eventName, code } = await req.json();
+
+        const token = process.env.TELEGRAM_BOT_TOKEN;
+        const chatId = process.env.TELEGRAM_CHAT_ID;
+
+        // Catch missing variables before executing network actions
+        if (!token || !chatId) {
+            return new Response(JSON.stringify({ error: 'Environment variables are missing on Vercel.' }), {
+                status: 500,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
+
+        const textAlert = `🚨 *OD Letter Authorization Request*\n\n` +
+                          `👤 *Requester/TL:* ${tlName}\n` +
+                          `🏆 *Event:* ${eventName}\n` +
+                          `🔢 *Security Verification PIN:* \`${code}\` \n\n` +
+                          `If you did not request this, do not share this PIN code.`;
+
+        const telegramUrl = `https://api.telegram.org/bot${token}/sendMessage`;
+
+        // Execute the dispatch request explicitly using web standard streams
         const telegramResponse = await fetch(telegramUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -32,12 +44,24 @@ export default async function handler(req, res) {
             })
         });
 
-        if (telegramResponse.ok) {
-            return res.status(200).json({ success: true });
+        const telegramData = await telegramResponse.json();
+
+        if (telegramResponse.ok && telegramData.ok) {
+            return new Response(JSON.stringify({ success: true }), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' }
+            });
         } else {
-            return res.status(502).json({ error: 'Telegram API delivery failure.' });
+            return new Response(JSON.stringify({ error: 'Telegram API rejected message request.', details: telegramData }), {
+                status: 400,
+                headers: { 'Content-Type': 'application/json' }
+            });
         }
+
     } catch (err) {
-        return res.status(500).json({ error: 'Internal server error.' });
+        return new Response(JSON.stringify({ error: 'Internal system execution catch block triggered.', details: err.message }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' }
+        });
     }
 }
