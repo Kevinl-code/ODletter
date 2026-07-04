@@ -177,13 +177,21 @@ table th, table td {
     font-size: 12pt;
 }
 
-.closing-area {
-    margin-top: 40px;
-    float: right;
-    text-align: left;
-    padding-right: 50px;
+.signature-table {
+    width: 100%;
+    margin-top: 50px;
+    border: none;
 }
 
+.signature-table td {
+    border: none;
+    padding: 0;
+}
+
+.signature-cell {
+    text-align: left;
+    vertical-align: bottom;
+}
 @media print {
     .control-panel, .security-toast, .no-print {
         display: none !important;
@@ -311,26 +319,35 @@ table th, table td {
 
             <center><p>Thank You</p></center>
 
-            <div class="left">
-           <p style="
-    width: 300px;
-    padding-left: 500px;
-">Yours faithfully,</p>
+            <center>
+    <p>Thank You</p>
+</center>
+
+<table class="signature-table">
+    <tr>
+        <td class="signature-cell">
+            <p>Yours faithfully,</p>
+
+            <br><br><br>
+
             <strong><span id="view_tl_name_close"></span></strong><br>
             Technical Team Leader
-            <table>
-                <thead>
-                    <tr>
-                        <th style="width: 8%;">S.No</th>
-                        <th>Student Name</th>
-                        <th>Register Number</th>
-                        <th style="width: 12%;">Year</th>
-                        <th style="width: 12%;">Section</th>
-                    </tr>
-                </thead>
-                <tbody id="view_student_rows"></tbody>
-            </table>
+        </td>
+    </tr>
+</table>
 
+<table>
+    <thead>
+        <tr>
+            <th>S.No</th>
+            <th>Student Name</th>
+            <th>Register Number</th>
+            <th>Year</th>
+            <th>Section</th>
+        </tr>
+    </thead>
+    <tbody id="view_student_rows"></tbody>
+</table>
         </div>
              </div>
 </div>
