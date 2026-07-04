@@ -228,11 +228,29 @@ table th, table td {
     <!-- Left Panel: Form UI -->
     <div class="control-panel no-print">
         <h2>Letterpad</h2>
-        
-        <div class="right">
-    <span id="view_place"></span>,
-    <span id="view_date"></span>
+        <div class="form-group">
+    <label>Date</label>
+    <input
+        type="date"
+        id="input_date"
+        oninput="updatePreview()">
+
+    <label>Place</label>
+    <input
+        type="text"
+        id="input_place"
+        value="Trichy"
+        oninput="updatePreview()">
 </div>
+
+<label>Requested By</label>
+<input
+    type="text"
+    id="input_requester"
+    placeholder="Student / Event Coordinator"
+    oninput="updatePreview()">
+        
+       
         <label>Requested By</label>
 <input
     type="text"
@@ -295,7 +313,10 @@ table th, table td {
         </div>
 
         <div id="letter_body" class="letter-container locked">
-            <div class="right" id="view_date"></div>
+             <div class="right">
+    <span id="view_place"></span>,
+    <span id="view_date"></span>
+</div>
             <br>
             <div class="left">
                 <b>From</b><br>
