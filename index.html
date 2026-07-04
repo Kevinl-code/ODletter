@@ -230,27 +230,23 @@ table th, table td {
         <h2>Letterpad</h2>
         <div class="form-group">
     <label>Date</label>
-    <input
-        type="date"
-        id="input_date"
-        oninput="updatePreview()">
+    <input type="date" id="input_date" oninput="updatePreview()">
+</div>
 
+<div class="form-group">
     <label>Place</label>
-    <input
-        type="text"
-        id="input_place"
-        value="Trichy"
-        oninput="updatePreview()">
+    <input type="text" id="input_place" value="Trichy" oninput="updatePreview()">
+</div>
 
-<label>Requested By</label>
-<input
-    type="text"
-    id="input_requester"
-    placeholder="Student / Event Coordinator"
-    oninput="updatePreview()">
-            <label>Technical Team Leader</label>
-            <input type="text" id="input_tl_name" value="Kevin Lazarus B" oninput="updatePreview()">
-        </div>
+<div class="form-group">
+    <label>Requested By</label>
+    <input type="text" id="input_requester" placeholder="Student / Event Coordinator" oninput="updatePreview()">
+</div>
+
+<div class="form-group">
+    <label>Technical Team Leader</label>
+    <input type="text" id="input_tl_name" value="Kevin Lazarus B" oninput="updatePreview()">
+</div>
         
         <div class="form-group">
             <label>Department</label>
@@ -385,21 +381,19 @@ function formatDateString(dateVal) {
     
 
 function updatePreview() {
-    const date = document.getElementById('input_date').value;
-    const placeEl = document.getElementById("view_place");
-if (placeEl) {
-    placeEl.innerText = place;
-}
-    const tlName = document.getElementById('input_tl_name').value || "___________";
-    const dept = document.getElementById('input_dept').value || "___________";
-    const college = document.getElementById('input_college').value || "___________";
-    const eventName = document.getElementById('input_event').value || "___________";
-    const organizer = document.getElementById('input_organizer').value || "___________";
-    const fromDate = document.getElementById('input_from_date').value;
-    const toDate = document.getElementById('input_to_date').value;
+    const date = document.getElementById("input_date").value;
+    const place = document.getElementById("input_place").value || "Trichy";
 
-    document.getElementById('view_date').innerText = date ? formatDateString(date) : formatDateString(new Date());
-    document.getElementById('view_place').innerText = place;
+    const tlName = document.getElementById("input_tl_name").value || "___________";
+    const dept = document.getElementById("input_dept").value || "___________";
+    const college = document.getElementById("input_college").value || "___________";
+    const eventName = document.getElementById("input_event").value || "___________";
+    const organizer = document.getElementById("input_organizer").value || "___________";
+    const fromDate = document.getElementById("input_from_date").value;
+    const toDate = document.getElementById("input_to_date").value;
+
+    document.getElementById("view_date").innerText = date ? formatDateString(date) : formatDateString(new Date());
+    document.getElementById("view_place").innerText = place;
     document.getElementById('view_tl_name').innerText = tlName;
     document.getElementById('view_tl_name_close').innerText = tlName;
     document.getElementById('view_dept_from').innerText = dept;
