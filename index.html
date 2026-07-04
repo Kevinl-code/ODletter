@@ -236,7 +236,12 @@ table th, table td {
 <input type="text" id="input_place" value="Trichy" oninput="updatePreview()">
         </div>
 
-        
+        <label>Requested By</label>
+<input
+    type="text"
+    id="input_requester"
+    placeholder="Student / Event Coordinator"
+    oninput="updatePreview()">
         <div class="form-group">
             <label>Technical Team Leader</label>
             <input type="text" id="input_tl_name" value="Kevin Lazarus B" oninput="updatePreview()">
@@ -287,7 +292,7 @@ table th, table td {
         <!-- Security Notification Overlay UI -->
         <div id="security_overlay" class="security-toast">
             <h3>🔒 Authorization Required</h3>
-            <p style="font-size:0.9rem; color:#bdc3c7;">A validation PIN has been dispatched to the Team Leader via Telegram. Please verify identity to view or print.</p>
+            <p style="font-size:0.9rem; color:#bdc3c7;">A validation PIN has been dispatched to the Tech Team Leader via Telegram. Please verify identity to view or print.</p>
             <input type="text" id="verification_pin_input" placeholder="000000" maxlength="6">
             <button class="btn" style="margin-top:0;" onclick="checkVerificationCode()">Unlock Document</button>
         </div>
@@ -407,6 +412,7 @@ function updatePreview() {
 
 // Interacts with serverless proxy endpoint to hide API Keys securely
 async function requestVerification() {
+    const requester = document.getElementById("input_requester").value;
     if(isDocumentVerified) {
         window.print();
         return;
@@ -423,6 +429,7 @@ async function requestVerification() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
+                requester,
                 tlName: tlName,
                 eventName: eventName,
                 code: generatedVerificationCode
