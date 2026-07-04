@@ -3,7 +3,12 @@ export default async function handler(req, res) {
         return res.status(405).json({ error: 'Method not allowed' });
     }
 
-    const { tlName, eventName, code } = req.body;
+    const {
+    requester,
+    tlName,
+    eventName,
+    code
+} = req.body;
 
     // Pull environmental secrets securely on server side execution
     const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -13,11 +18,21 @@ export default async function handler(req, res) {
         return res.status(500).json({ error: 'Server environmental credentials configuration missing.' });
     }
 
-    const textAlert = `🚨 *OD Letter Authorization Request*\n\n` +
-                      `👤 *Requester/TL:* ${tlName}\n` +
-                      `🏆 *Event:* ${eventName}\n` +
-                      `🔢 *Security Verification PIN:* \`${code}\` \n\n` +
-                      `If you did not request this, do not share this PIN code.`;
+    const textAlert =
+`🔐 OD Letter Verification
+
+👤 Requested By: ${requester}
+
+📝 Technical Team Leader:
+${tlName}
+
+🏆 Event:
+${eventName}
+
+🔢 Verification Code:
+${code}
+
+Please share this code only if you approve generation of this OD letter.`;
 
     const telegramUrl = `https://api.telegram.org/bot${token}/sendMessage`;
 
