@@ -203,20 +203,56 @@ table th, table td {
     display: block;
     margin-top: 45px;   /* space for signature */
 }
-@media print {
-    .control-panel, .security-toast, .no-print {
+@media print {.control-panel, .security-toast, .no-print {
         display: none !important;
     }
-    .preview-panel {
+.preview-panel {
         width: 100%;
         padding: 0;
         background: none;
     }
-    .letter-container {
+.letter-container {
         box-shadow: none;
         margin: 0;
         width: 100%;
         filter: none !important;
+    }
+/* Responsive Layout for Mobile Devices */
+@media screen and (max-width: 768px) {
+.app-wrapper {
+        flex-direction: column; /* Stack panels vertically instead of side-by-side */
+    }
+
+.control-panel {
+        width: 100%;
+        max-height: none; /* Allow natural scrolling down the page */
+        overflow-y: visible;
+        border-bottom: 2px solid #ccc;
+    }
+
+.preview-panel {
+        width: 100%;
+        padding: 15px; /* Reduce heavy desktop padding */
+        max-height: none;
+        overflow-x: auto; /* Allow side-scrolling for the formal document letter if needed */
+        justify-content: flex-start;
+    }
+
+.letter-container {
+        width: 100%; /* Overwrite the strict 210mm A4 layout on mobile screen views */
+        min-height: auto;
+        padding: 15px;
+        font-size: 10pt; /* Scale down typography slightly for mobile screens */
+    }
+
+table th, table td {
+        font-size: 10pt;
+        padding: 4px; /* Compress tables so they don't break boundaries */
+    }
+    
+.security-toast {
+        width: 90%; /* Center overlay beautifully on narrower phone screens */
+        box-sizing: border-box;
     }
 }
 </style>
