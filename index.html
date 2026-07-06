@@ -4,184 +4,297 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>On-Duty Request Letter Generator & Verifier</title>
+    
+    <!-- Premium Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,300..900;1,300..900&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap" rel="stylesheet">
 
     <style>
-        /* App Layout Wrapper */
-        .app-wrapper {
-            display: flex;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f4f6f9;
-            min-height: 100vh;
+        :root {
+            --glass-bg: rgba(255, 255, 255, 0.45);
+            --glass-border: rgba(255, 255, 255, 0.25);
+            --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.08);
+            --primary-gradient: linear-gradient(135deg, #4f46e5, #3b82f6);
+            --success-gradient: linear-gradient(135deg, #10b981, #059669);
+            --danger-gradient: linear-gradient(135deg, #ef4444, #dc2626);
+            --text-dark: #1e293b;
+            --text-muted: #64748b;
         }
 
-        /* Control Panel / Form Styling */
+        /* App Layout Wrapper with Modern Mesh Gradient */
+        .app-wrapper {
+            display: flex;
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, #e0e7ff 0%, #f1f5f9 50%, #dbeafe 100%);
+            background-attachment: fixed;
+            min-height: 100vh;
+            color: var(--text-dark);
+        }
+
+        /* Glassmorphic Control Panel */
         .control-panel {
             width: 35%;
-            padding: 25px;
-            background-color: #ffffff;
-            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+            padding: 30px;
+            background: rgba(255, 255, 255, 0.4);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-right: 1px solid var(--glass-border);
+            box-shadow: var(--glass-shadow);
             box-sizing: border-box;
             overflow-y: auto;
             max-height: 100vh;
         }
 
+        .control-panel::-webkit-scrollbar {
+            width: 6px;
+        }
+        .control-panel::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+        }
+
         .control-panel h2 {
-            color: #2c3e50;
+            font-family: 'Figtree', sans-serif;
+            font-weight: 800;
+            color: #0f172a;
             margin-top: 0;
-            border-bottom: 2px solid #3498db;
-            padding-bottom: 10px;
+            letter-spacing: -0.5px;
+            border-bottom: 2px solid rgba(79, 70, 229, 0.3);
+            padding-bottom: 15px;
+            font-size: 1.8rem;
+        }
+
+        h3 {
+            font-family: 'Figtree', sans-serif;
+            font-weight: 700;
+            color: #334155;
+            margin-top: 25px;
         }
 
         .form-group {
-            margin-bottom: 15px;
+            margin-bottom: 20px;
         }
 
         .form-group label {
             display: block;
+            font-family: 'Figtree', sans-serif;
             font-weight: 600;
-            margin-bottom: 5px;
-            color: #34495e;
-            font-size: 0.95rem;
-        }
-
-        .form-group input {
-            width: 100%;
-            padding: 8px 12px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            box-sizing: border-box;
-            font-size: 0.95rem;
-        }
-
-        .student-entry {
-            background: #f8f9fa;
-            border: 1px dashed #bdc3c7;
-            padding: 10px;
-            margin-bottom: 10px;
-            border-radius: 4px;
-        }
-
-        .btn {
-            background-color: #3498db;
-            color: white;
-            padding: 12px 15px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: bold;
-            width: 100%;
-            margin-top: 10px;
-            font-size: 1rem;
-        }
-
-        .btn:hover {
-            background-color: #2980b9;
-        }
-
-        .btn-add-student {
-            background-color: #2ecc71;
-            margin-bottom: 15px;
-            padding: 8px 12px;
+            margin-bottom: 8px;
+            color: #475569;
             font-size: 0.9rem;
         }
 
+        /* Premium Glass Inputs and Date Pickers */
+        .form-group input {
+            width: 100%;
+            padding: 11px 16px;
+            background: rgba(255, 255, 255, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.7);
+            border-radius: 12px;
+            box-sizing: border-box;
+            font-family: 'Poppins', sans-serif;
+            font-size: 0.95rem;
+            color: var(--text-dark);
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+            transition: all 0.3s ease;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            background: rgba(255, 255, 255, 0.9);
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.15);
+        }
+
+        /* Customizing Calendar Icon and Picker Structure */
+        input[type="date"] {
+            cursor: pointer;
+            position: relative;
+        }
+
+        /* Translucent Entry Boxes for Students */
+        .student-entry {
+            background: rgba(255, 255, 255, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 14px;
+            transition: all 0.2s ease;
+        }
+
+        .student-entry input {
+            background: rgba(255, 255, 255, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 0.88rem;
+        }
+
+        /* Modern Gradient Buttons */
+        .btn {
+            background: var(--primary-gradient);
+            color: white;
+            padding: 14px 20px;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            font-family: 'Figtree', sans-serif;
+            font-weight: 700;
+            width: 100%;
+            margin-top: 10px;
+            font-size: 1rem;
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(79, 70, 229, 0.35);
+            opacity: 0.95;
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-add-student {
+            background: transparent;
+            color: #4f46e5;
+            border: 2px dashed rgba(79, 70, 229, 0.4);
+            box-shadow: none;
+            margin-bottom: 20px;
+            padding: 10px 15px;
+            font-size: 0.9rem;
+            border-radius: 12px;
+        }
+
         .btn-add-student:hover {
-            background-color: #27ae60;
+            background: rgba(79, 70, 229, 0.06);
+            border-color: #4f46e5;
+            box-shadow: none;
+            color: #4f46e5;
         }
 
         .btn-verify {
-            background-color: #e74c3c;
+            background: var(--danger-gradient);
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25);
         }
-
         .btn-verify:hover {
-            background-color: #c0392b;
+            box-shadow: 0 6px 20px rgba(239, 68, 68, 0.35);
         }
 
-        /* Security Overlay Blurring the Document Preview */
+        /* Preview Workspace */
         .preview-panel {
             width: 65%;
-            padding: 40px;
+            padding: 50px;
             box-sizing: border-box;
             overflow-y: auto;
             max-height: 100vh;
             display: flex;
             justify-content: center;
-            background-color: #ecf0f1;
+            align-items: flex-start;
             position: relative;
         }
 
+        /* Authentic A4 Formal Letter Styling */
         .letter-container {
             width: 210mm;
             min-height: 297mm;
             padding: 25mm;
             background-color: #ffffff;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            border-radius: 4px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06), 0 1px 8px rgba(0, 0, 0, 0.03);
             box-sizing: border-box;
             color: #000;
             font-family: "Times New Roman", Times, serif;
             font-size: 12pt;
-            line-height: 1.5;
-            transition: filter 0.3s ease;
+            line-height: 1.6;
+            transition: filter 0.4s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
-        /* Security classes to stop screenshots or unverified views */
+        /* Secure Overlay Locking System */
         .locked {
-            filter: blur(12px);
+            filter: blur(16px);
             pointer-events: none;
             user-select: none;
         }
 
         .security-toast {
             position: absolute;
-            top: 50%;
+            top: 40%;
             left: 50%;
             transform: translate(-50%, -50%);
-            background: rgba(44, 62, 80, 0.98);
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
             color: white;
-            padding: 30px;
-            border-radius: 8px;
+            padding: 35px;
+            border-radius: 20px;
             text-align: center;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.3);
             z-index: 10;
-            width: 340px;
+            width: 360px;
+            animation: fadeIn 0.4s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translate(-50%, -45%); }
+            to { opacity: 1; transform: translate(-50%, -50%); }
+        }
+
+        .security-toast h3 {
+            color: #ffffff;
+            margin-top: 0;
+            font-size: 1.35rem;
         }
 
         .security-toast input {
-            width: 80%;
-            padding: 10px;
-            margin: 15px 0;
+            width: 85%;
+            padding: 12px;
+            margin: 20px 0;
             text-align: center;
-            font-size: 1.25rem;
-            letter-spacing: 5px;
+            font-size: 1.4rem;
+            font-family: 'Poppins', sans-serif;
+            font-weight: 600;
+            letter-spacing: 6px;
             border: none;
-            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 10px;
             color: #000;
         }
 
-        /* Print Layout Specifications */
+        .security-toast input:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px #4f46e5;
+        }
+
+        /* Document Component Specifications */
         .right { text-align: right; }
         .left { text-align: left; }
-        .subject { font-weight: bold; margin-top: 20px; margin-bottom: 20px; }
+        .subject { font-weight: bold; margin-top: 25px; margin-bottom: 25px; }
         .content { text-align: justify; text-indent: 40px; }
 
         table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 20px;
-            margin-bottom: 20px;
+            margin-top: 25px;
+            margin-bottom: 25px;
         }
 
         table th, table td {
             border: 1px solid #000;
-            padding: 8px;
+            padding: 10px;
             text-align: center;
             font-size: 12pt;
         }
 
         .signature-table {
             width: 100%;
-            margin-top: 30px;
-            margin-bottom: 30px;
+            margin-top: 35px;
+            margin-bottom: 35px;
             border: none;
         }
 
@@ -193,7 +306,7 @@
         .signature-cell {
             text-align: right;
             vertical-align: bottom;
-            padding-right: 40px;
+            padding-right: 20px;
         }
 
         .signature-cell p {
@@ -202,17 +315,23 @@
 
         .signature-cell strong {
             display: block;
-            margin-top: 45px;   /* space for signature */
+            margin-top: 55px;
         }
 
+        /* System Printing Standards Override */
         @media print {
             .control-panel, .security-toast, .no-print {
                 display: none !important;
+            }
+            .app-wrapper {
+                background: none !important;
             }
             .preview-panel {
                 width: 100%;
                 padding: 0;
                 background: none;
+                overflow: visible;
+                max-height: none;
             }
             .letter-container {
                 box-shadow: none;
@@ -222,43 +341,12 @@
             }
         }
 
-        /* Responsive Layout for Mobile Devices */
-        @media screen and (max-width: 768px) {
-            .app-wrapper {
-                flex-direction: column; /* Stack panels vertically instead of side-by-side */
-            }
-
-            .control-panel {
-                width: 100%;
-                max-height: none; /* Allow natural scrolling down the page */
-                overflow-y: visible;
-                border-bottom: 2px solid #ccc;
-            }
-
-            .preview-panel {
-                width: 100%;
-                padding: 15px; /* Reduce heavy desktop padding */
-                max-height: none;
-                overflow-x: auto; /* Allow side-scrolling for the formal document letter if needed */
-                justify-content: flex-start;
-            }
-
-            .letter-container {
-                width: 100%; /* Overwrite the strict 210mm A4 layout on mobile screen views */
-                min-height: auto;
-                padding: 15px;
-                font-size: 10pt; /* Scale down typography slightly for mobile screens */
-            }
-
-            table th, table td {
-                font-size: 10pt;
-                padding: 4px; /* Compress tables so they don't break boundaries */
-            }
-
-            .security-toast {
-                width: 90%; /* Center overlay beautifully on narrower phone screens */
-                box-sizing: border-box;
-            }
+        /* Responsive Layout Rules */
+        @media screen and (max-width: 1024px) {
+            .app-wrapper { flex-direction: column; }
+            .control-panel { width: 100%; max-height: none; overflow-y: visible; }
+            .preview-panel { width: 100%; padding: 20px; max-height: none; }
+            .letter-container { width: 100%; min-height: auto; padding: 20px; font-size: 11pt; }
         }
     </style>
 </head>
@@ -266,7 +354,7 @@
 
 <div class="app-wrapper">
 
-    <!-- Left Panel: Form UI -->
+    <!-- Left Panel: Modern UI Controls -->
     <div class="control-panel no-print">
         <h2>Letterpad</h2>
         
@@ -302,7 +390,7 @@
 
         <div class="form-group">
             <label>Event Name</label>
-            <input type="text" id="input_event" value="" oninput="updatePreview()">
+            <input type="text" id="input_event" value="" placeholder="e.g. Intercollegiate Hackathon" oninput="updatePreview()">
         </div>
 
         <div class="form-group">
@@ -316,11 +404,11 @@
         </div>
 
         <div class="form-group">
-            <label>Optional Date (if >1)</label>
+            <label>Optional Date (if &gt;1)</label>
             <input type="date" id="input_to_date" oninput="updatePreview()">
         </div>
 
-        <hr style="border: 0; border-top: 1px solid #ccc; margin: 20px 0;">
+        <hr style="border: 0; border-top: 1px solid rgba(0,0,0,0.08); margin: 25px 0;">
 
         <h3>Students List</h3>
         <div id="student_inputs_container"></div>
@@ -329,15 +417,15 @@
         <button id="action_btn" class="btn btn-verify" onclick="requestVerification()">Generate Code</button>
     </div>
 
-    <!-- Right Panel: Secure Document Preview -->
+    <!-- Right Panel: Secure Document Presentation Workspace -->
     <div class="preview-panel">
 
-        <!-- Security Notification Overlay UI -->
+        <!-- Dynamic Security Glass UI Card -->
         <div id="security_overlay" class="security-toast">
             <h3>🔒 Authorization Required</h3>
-            <p style="font-size:0.9rem; color:#bdc3c7;">A validation PIN has been dispatched to the Tech Team Leader via Telegram. Please verify identity to view or print.</p>
+            <p style="font-size:0.88rem; color:#cbd5e1; line-height: 1.4;">A validation PIN has been dispatched to the Tech Team Leader via Telegram. Please verify identity to view or print.</p>
             <input type="text" id="verification_pin_input" placeholder="000000" maxlength="6">
-            <button class="btn" style="margin-top:0;" onclick="checkVerificationCode()">Unlock Document</button>
+            <button class="btn" style="margin-top:0; background: var(--primary-gradient);" onclick="checkVerificationCode()">Unlock Document</button>
         </div>
 
         <div id="letter_body" class="letter-container locked">
@@ -455,7 +543,6 @@
         });
     }
 
-    // Interacts with serverless proxy endpoint to hide API Keys securely
     async function requestVerification() {
         const requester = document.getElementById("input_requester").value;
         if(isDocumentVerified) {
@@ -463,7 +550,6 @@
             return;
         }
 
-        // Generate frontend confirmation code 
         generatedVerificationCode = Math.floor(100000 + Math.random() * 900000).toString();
 
         const tlName = document.getElementById('input_tl_name').value;
@@ -502,7 +588,8 @@
 
             const actionBtn = document.getElementById('action_btn');
             actionBtn.innerText = "Print Document / Save PDF";
-            actionBtn.style.backgroundColor = "#2ecc71";
+            actionBtn.style.background = "var(--success-gradient)";
+            actionBtn.style.boxShadow = "0 4px 12px rgba(16, 185, 129, 0.25)";
 
             alert("Identity verified successfully! Document unlocked.");
         } else {
@@ -517,15 +604,15 @@
             const div = document.createElement('div');
             div.className = 'student-entry';
             div.innerHTML = `
-                <div style="font-weight:bold; margin-bottom: 5px; font-size:0.85rem; display:flex; justify-content:space-between;">
+                <div style="font-weight:600; font-family:'Figtree', sans-serif; margin-bottom: 8px; font-size:0.85rem; display:flex; justify-content:space-between; color:#475569;">
                     <span>Student #${index + 1}</span>
-                    <span style="color:#e74c3c; cursor:pointer;" onclick="removeStudent(${index})">Remove</span>
+                    <span style="color:#ef4444; cursor:pointer; font-weight:700;" onclick="removeStudent(${index})">Remove</span>
                 </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom:5px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom:8px;">
                     <input type="text" placeholder="Name" value="${student.name}" oninput="updateStudentData(${index}, 'name', this.value)">
                     <input type="text" placeholder="Reg No" value="${student.regNo}" oninput="updateStudentData(${index}, 'regNo', this.value)">
                 </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
                     <input type="text" placeholder="Year" value="${student.year}" oninput="updateStudentData(${index}, 'year', this.value)">
                     <input type="text" placeholder="Section" value="${student.section}" oninput="updateStudentData(${index}, 'section', this.value)">
                 </div>`;
