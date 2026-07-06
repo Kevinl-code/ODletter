@@ -497,7 +497,7 @@
 </div>
 
 <script>
-    let students = [{ name: '', regNo: '', year: '', section: 'A' }];
+        let students = [{ name: '', regNo: '', year: '', section: 'A' }];
     let generatedVerificationCode = null;
     let isDocumentVerified = false;
 
@@ -578,6 +578,34 @@
         }
     }
 
+    /* Transmits the copy out to Telegram or Email channels via backend routing */
+    async function dispatchFinalCopy() {
+        const payload = {
+            meta: {
+                date: document.getElementById("view_date").innerText,
+                place: document.getElementById("view_place").innerText,
+                teamLeader: document.getElementById("view_tl_name").innerText,
+                department: document.getElementById("view_dept_body").innerText,
+                college: document.getElementById("view_college_from").innerText,
+                event: document.getElementById("view_event_body").innerText,
+                organizer: document.getElementById("view_organizer_body").innerText,
+                timeline: `${document.getElementById("view_from_date_body").innerText} to ${document.getElementById("view_to_date_body").innerText}`
+            },
+            students: students
+        };
+
+        try {
+            await fetch('/api/dispatch-copy', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            console.log("A permanent digital backup copy has been routed via Telegram/Email protocols.");
+        } catch (e) {
+            console.error("Transmission error:", e);
+        }
+    }
+
     function checkVerificationCode() {
         const userEnteredPin = document.getElementById('verification_pin_input').value;
 
@@ -592,6 +620,9 @@
             actionBtn.style.boxShadow = "0 4px 12px rgba(16, 185, 129, 0.25)";
 
             alert("Identity verified successfully! Document unlocked.");
+            
+            // Automatically execute delivery function to your channels
+            dispatchFinalCopy();
         } else {
             alert("Incorrect Verification Code. Access Denied.");
         }
@@ -629,6 +660,7 @@
     document.getElementById('input_to_date').valueAsDate = new Date();
     renderStudentInputs();
     updatePreview();
+
 </script>
 </body>
 </html>
