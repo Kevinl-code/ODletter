@@ -349,6 +349,8 @@
             .letter-container { width: 100%; min-height: auto; padding: 20px; font-size: 11pt; }
         }
     </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
 </head>
 <body>
 
@@ -423,7 +425,7 @@
         <!-- Dynamic Security Glass UI Card -->
         <div id="security_overlay" class="security-toast">
             <h3>🔒 Authorization Required</h3>
-            <p style="font-size:0.88rem; color:#cbd5e1; line-height: 1.4;">A validation PIN has been dispatched to the Tech Team Leader via Telegram. Please verify identity to view or print.</p>
+            <p style="font-size:0.88rem; color:#cbd5e1; line-height: 1.4;">A validation PIN has been dispatched to the Tech Head via Telegram. Please verify identity to view or print.</p>
             <input type="text" id="verification_pin_input" placeholder="000000" maxlength="6">
             <button class="btn" style="margin-top:0; background: var(--primary-gradient);" onclick="checkVerificationCode()">Unlock Document</button>
         </div>
@@ -437,7 +439,7 @@
             <div class="left">
                 <b>From</b><br>
                 <span id="view_tl_name"></span><br>
-                Technical Team Leader<br>
+                Technical Head<br>
                 Department of <span id="view_dept_from"></span><br>
                 <span id="view_college_from"></span>
             </div>
@@ -475,7 +477,7 @@
                     <td class="signature-cell">
                         <p>Yours faithfully,</p>
                         <strong><span id="view_tl_name_close"></span></strong><br>
-                        Technical Team Leader
+                        Technical Head
                     </td>
                 </tr>
             </table>
@@ -544,39 +546,51 @@
     }
 
     async function requestVerification() {
-        const requester = document.getElementById("input_requester").value;
-        if(isDocumentVerified) {
-            window.print();
-            return;
-        }
-
-        generatedVerificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-
-        const tlName = document.getElementById('input_tl_name').value;
-        const eventName = document.getElementById('input_event').value;
-
-        try {
-            const response = await fetch('/api/verify', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    requester,
-                    tlName: tlName,
-                    eventName: eventName,
-                    code: generatedVerificationCode
-                })
-            });
-
-            if (response.ok) {
-                alert("Verification code securely dispatched to the Team Leader's Telegram device.");
-            } else {
-                alert("Error sending dispatch request via secure server.");
-            }
-        } catch (err) {
-            console.error(err);
-            alert("Server processing error. Ensure serverless functions are configured.");
-        }
+    const requester = document.getElementById("input_requester").value;
+    
+    if(isDocumentVerified) {
+        // Direct PDF Download Logic
+        const element = document.getElementById('letter_body');
+        const opt = {
+            margin:       0,
+            filename:     'On-Duty-Request-Letter.pdf',
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2, useCORS: true },
+            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+        
+        html2pdf().from(element).set(opt).save();
+        return;
     }
+
+    generatedVerificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+    const tlName = document.getElementById('input_tl_name').value;
+    const eventName = document.getElementById('input_event').value;
+
+    try {
+        const response = await fetch('/api/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                requester,
+                tlName: tlName,
+                eventName: eventName,
+                code: generatedVerificationCode
+            })
+        });
+
+        if (response.ok) {
+            alert("Verification code securely dispatched to the Team Leader's Telegram device.");
+        } else {
+            alert("Error sending dispatch request via secure server.");
+        }
+    } catch (err) {
+        console.error(err);
+        alert("Server processing error. Ensure serverless functions are configured.");
+    }
+}
+
 
     /* Transmits the copy out to Telegram or Email channels via backend routing */
     async function dispatchFinalCopy() {
@@ -615,7 +629,7 @@
             document.getElementById('security_overlay').style.display = 'none';
 
             const actionBtn = document.getElementById('action_btn');
-            actionBtn.innerText = "Print Document / Save PDF";
+            actionBtn.innerText = "Download PDF";
             actionBtn.style.background = "var(--success-gradient)";
             actionBtn.style.boxShadow = "0 4px 12px rgba(16, 185, 129, 0.25)";
 
