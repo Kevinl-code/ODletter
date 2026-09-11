@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>On-Duty Request Letter Generator</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@300;400;500;600;700;800&family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<!-- PDF libraries: jsDelivr is used instead of the previous cdnjs dependency. -->
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+
+<style>
+*{box-sizing:border-box}
+:root{
+    --primary:#4f46e5;
+    --primary2:#7c3aed;
+    --success:#10b981;
+    --danger:#ef4444;
+    --text-dark:#1e293b;
+    --muted:#64748b;
+}
+body{
+    margin:0;
+    font-family:"Poppins",sans-serif;
+    background:linear-gradient(135deg,#e0e7ff 0%,#f8fafc 50%,#dbeafe 100%);
+    min-height:100vh;
+    color:var(--text-dark);
+}
+.app-wrapper{min-height:100vh;display:flex}
+.control-panel{
+    width:35%;
+    max-height:100vh;
+    overflow-y:auto;
+    padding:30px;
+    background:rgba(255,255,255,.65);
+    backdrop-filter:blur(16px);
+    -webkit-backdrop-filter:blur(16px);
+    border-right:1px solid rgba(255,255,255,.4);
+    box-shadow:0 8px 32px rgba(31,38,135,.12);
+}
+.control-panel h2{
+    margin:0 0 25px;
+    font-family:"Figtree",sans-serif;
+    font-size:1.8rem;
+    font-weight:800;
+    color:#0f172a;
+    border-bottom:2px solid rgba(79,70,229,.25);
+    padding-bottom:15px;
+}
+.control-panel h3{margin-top:25px;color:#334155}
+.form-group{margin-bottom:18px}
+.form-group label{
+    display:block;
+    margin-bottom:7px;
+    font-family:"Figtree",sans-serif;
+    font-size:.9rem;
+    font-weight:600;
+    color:#475569;
+}
+input,select{
+    width:100%;
+    padding:11px 12px;
+    border:1px solid rgba(100,116,139,.25);
+    border-radius:10px;
+    background:rgba(255,255,255,.8);
+    outline:none;
+    font-family:"Poppins",sans-serif;
+    font-size:14px;
+}
+input:focus,select:focus{
+    border-color:var(--primary);
+    box-shadow:0 0 0 3px rgba(79,70,229,.1);
+}
+.student-entry{
+    margin-bottom:12px;
+    padding:12px;
+    border-radius:12px;
+    background:rgba(255,255,255,.55);
+    border:1px solid rgba(100,116,139,.15);
+}
+.btn{
+    width:100%;
+    border:0;
+    border-radius:10px;
+    padding:12px 16px;
+    margin-top:8px;
+    color:#fff;
+    font-family:"Poppins",sans-serif;
+    font-weight:600;
+    cursor:pointer;
+    transition:.18s ease;
+}
+.btn:hover{transform:translateY(-1px);box-shadow:0 8px 20px rgba(79,70,229,.18)}
+.btn:disabled{opacity:.6;cursor:not-allowed;transform:none}
+.btn-add-student{background:linear-gradient(135deg,#6366f1,#4f46e5)}
+.btn-download{background:linear-gradient(135deg,#10b981,#059669)}
+.preview-panel{
+    width:65%;
+    min-height:100vh;
+    padding:40px;
+    overflow:auto;
+}
+.info-banner{
+    max-width:600px;
+    margin:0 auto 20px;
+    padding:15px 18px;
+    background:rgba(255,255,255,.7);
+    border:1px solid rgba(79,70,229,.12);
+    color:#475569;
+    border-radius:14px;
+    box-shadow:0 10px 30px rgba(15,23,42,.08);
+    font-size:13px;
+}
+.info-banner strong{color:#312e81}
+.conditional-fields{
+    margin-top:10px;
+    padding:12px;
+    border-radius:12px;
+    background:rgba(99,102,241,.06);
+    border:1px solid rgba(99,102,241,.12);
+}
+.hidden{display:none!important}
+.letter-container{
+    width:210mm;
+    min-height:297mm;
+    margin:0 auto;
+    padding:22mm 20mm;
+    background:#fff;
+    color:#111827;
+    font-family:"Times New Roman",serif;
+    font-size:12pt;
+    line-height:1.55;
+    box-shadow:0 10px 40px rgba(15,23,42,.15);
+    position:relative;
+}
+.right{text-align:right}.left{text-align:left}
+.subject{margin-top:24px;margin-bottom:22px;font-weight:bold}
+.content{text-align:justify}
+.signature-table{width:100%;border-collapse:collapse;margin-top:40px}
+.signature-table td{border:0;padding:0}
+.signature-cell{text-align:right;vertical-align:bottom}
+.signature-cell strong{display:block;margin-top:50px}
+.letter-container>table:not(.signature-table){
+    width:100%;border-collapse:collapse;margin-top:30px
+}
+.letter-container>table:not(.signature-table) th,
+.letter-container>table:not(.signature-table) td{
+    border:1px solid #111;padding:7px;text-align:center;font-size:11pt
+}
+.letter-container>table:not(.signature-table) th{font-weight:bold}
+
+/* PDF-only rendering */
+.pdf-render{
+    width:210mm!important;
+    min-height:297mm!important;
+    margin:0!important;
+    padding:22mm 20mm!important;
+    background:#fff!important;
+    box-shadow:none!important;
+    filter:none!important;
+    backdrop-filter:none!important;
+    -webkit-backdrop-filter:none!important;
+    overflow:visible!important;
+    color:#111827!important;
+    font-family:"Times New Roman",serif!important;
+    position:absolute!important;
+    left:0!important;
+    top:0!important;
+}
+.pdf-render *{visibility:visible!important}
+
+/* Premium modal */
+.modal-backdrop{
+    position:fixed;
+    inset:0;
+    z-index:9999;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+    background:rgba(15,23,42,.58);
+    backdrop-filter:blur(10px);
+    -webkit-backdrop-filter:blur(10px);
+    opacity:0;
+    visibility:hidden;
+    transition:.22s ease;
+}
+.modal-backdrop.show{opacity:1;visibility:visible}
+.modal-card{
+    width:min(440px,100%);
+    background:linear-gradient(145deg,rgba(255,255,255,.98),rgba(248,250,252,.98));
+    border:1px solid rgba(255,255,255,.8);
+    border-radius:24px;
+    padding:28px;
+    box-shadow:0 30px 90px rgba(15,23,42,.35);
+    transform:translateY(15px) scale(.97);
+    transition:.25s ease;
+}
+.modal-backdrop.show .modal-card{transform:translateY(0) scale(1)}
+.modal-icon{
+    width:58px;height:58px;border-radius:18px;
+    display:grid;place-items:center;
+    font-size:25px;margin-bottom:18px;
+}
+.modal-icon.success{background:rgba(16,185,129,.12);color:#059669}
+.modal-icon.error{background:rgba(239,68,68,.12);color:#dc2626}
+.modal-card h3{margin:0 0 8px;font-size:21px;color:#0f172a}
+.modal-card p{margin:0;color:#64748b;line-height:1.6;font-size:14px}
+.modal-actions{display:flex;gap:10px;margin-top:22px}
+.modal-actions button{
+    flex:1;border:0;border-radius:12px;padding:12px 14px;
+    font-family:"Poppins",sans-serif;font-weight:700;cursor:pointer;
+}
+.modal-primary{background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff}
+.modal-secondary{background:#eef2ff;color:#3730a3}
+.modal-close{background:#f1f5f9;color:#475569}
+.modal-actions button:hover{transform:translateY(-1px)}
+.modal-hint{margin-top:12px!important;font-size:12px!important;color:#94a3b8!important}
+
+@media screen and (max-width:1024px){
+    .app-wrapper{flex-direction:column}
+    .control-panel,.preview-panel{width:100%}
+    .control-panel{max-height:none}
+    .preview-panel{padding:20px}
+    .letter-container{width:100%;min-height:auto}
+}
+@media(max-width:560px){
+    .control-panel{padding:20px}
+    .preview-panel{padding:12px}
+    .letter-container{padding:18mm 12mm;font-size:11pt}
+    .modal-card{padding:22px;border-radius:20px}
+    .modal-actions{flex-direction:column}
+}
+@media print{
+    .control-panel,.info-banner,.no-print{display:none!important}
+    body{background:#fff!important}
+    .app-wrapper{display:block}
+    .preview-panel{width:100%;padding:0}
+    .letter-container{
+        width:210mm;min-height:297mm;margin:0;box-shadow:none
+    }
+}
+</style>
+</head>
+
+<body>
+<div class="app-wrapper">
+
+<div class="control-panel no-print">
+    <h2>Letterpad</h2>
+
+    <div class="form-group">
+        <label>Date</label>
+        <input type="date" id="input_date" oninput="updatePreview()">
+    </div>
+    <div class="form-group">
+        <label>Place</label>
+        <input type="text" id="input_place" value="Trichy" oninput="updatePreview()">
+    </div>
+
+    <div class="form-group">
+        <label>From — Person Requesting OD</label>
+        <select id="input_from_person" onchange="handleFromPersonChange()">
+            <option value="kevin" selected>Kevin Lazarus B — Technical Head</option>
+            <option value="other">Other — Edit details</option>
+        </select>
+    </div>
+
+    <div id="other_from_fields" class="conditional-fields hidden">
+        <div class="form-group">
+            <label>Name</label>
+            <input type="text" id="input_from_name" placeholder="Enter name" oninput="updatePreview()">
+        </div>
+        <div class="form-group">
+            <label>Designation / Class</label>
+            <input type="text" id="input_from_class" placeholder="e.g. II M.Sc. Data Science / Class Representative" oninput="updatePreview()">
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label>Who is asking for OD?</label>
+        <select id="input_requester_type" onchange="updatePreview()">
+            <option value="student" selected>Student</option>
+            <option value="event">Event Coordinator</option>
+            <option value="team">Technical Team</option>
+            <option value="other">Other</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label>Requester Name</label>
+        <input type="text" id="input_requester" placeholder="Student / Event Coordinator" oninput="updatePreview()">
+    </div>
+
+    <div class="form-group">
+        <label>Technical Team Leader</label>
+        <input type="text" id="input_tl_name" value="Kevin Lazarus B" oninput="updatePreview()">
+    </div>
+
+    <div class="form-group">
+        <label>Department</label>
+        <input type="text" id="input_dept" value="Data Science" oninput="updatePreview()">
+    </div>
+
+    <div class="form-group">
+        <label>College / Institution Name</label>
+        <input type="text" id="input_college" value="Bishop Heber College" oninput="updatePreview()">
+    </div>
+
+    <div class="form-group">
+        <label>Event Name</label>
+        <input type="text" id="input_event" placeholder="e.g. Intercollegiate Hackathon" oninput="updatePreview()">
+    </div>
+
+    <div class="form-group">
+        <label>Organizing Institution & Place</label>
+        <input type="text" id="input_organizer" value="College Name, Trichy" oninput="updatePreview()">
+    </div>
+
+    <div class="form-group">
+        <label>From Date</label>
+        <input type="date" id="input_from_date" oninput="updatePreview()">
+    </div>
+
+    <div class="form-group">
+        <label>To Date</label>
+        <input type="date" id="input_to_date" oninput="updatePreview()">
+    </div>
+
+    <hr style="border:0;border-top:1px solid rgba(0,0,0,.08);margin:25px 0">
+
+    <h3>Students List</h3>
+    <div id="student_inputs_container"></div>
+    <button type="button" class="btn btn-add-student" onclick="addStudentInput()">+ Add Student</button>
+
+    <button id="action_btn" class="btn btn-download" onclick="downloadPDF()">Download PDF</button>
+</div>
+
+<div class="preview-panel">
+    <div class="info-banner no-print">
+        <strong>Ready to generate.</strong> Fill the letter details and student list, then use <b>Download PDF</b>. No OTP or Telegram verification is required.
+    </div>
+
+    <div id="letter_body" class="letter-container">
+        <div class="right">
+            <span id="view_place"></span>
+            <br>
+            <span id="view_date"></span>
+        </div>
+
+        <br>
+
+        <div class="left">
+            <b>From</b><br>
+            <span id="view_from_name"></span><br>
+            <span id="view_from_designation"></span><br>
+            Department of <span id="view_dept_from"></span><br>
+            <span id="view_college_from"></span>
+        </div>
+
+        <br>
+
+        <div class="left">
+            <b>To</b><br>
+            The Head of the Department<br>
+            Department of <span id="view_dept_to"></span><br>
+            <span id="view_college_to"></span>
+        </div>
+
+        <div class="subject">
+            Subject: Request for Grant of On-Duty Permission
+            for Students Participating in
+            <span id="view_event_subj"></span>
+        </div>
+
+        <p>Respected Mam,</p>
+
+        <p class="content">
+            I respectfully submit that the following students of the Department of
+            <span id="view_dept_body"></span>
+            have registered to participate in
+            <b id="view_event_body"></b>
+            organized by
+            <b id="view_organizer_body"></b>
+            <span id="view_date_sentence"></span>.
+        </p>
+
+        <p class="content">
+            The event is of academic significance and will provide valuable exposure
+            to the participants. Therefore, I kindly request you to grant On-Duty (OD)
+            permission for the following students during the above mentioned period.
+        </p>
+
+        <center><p>Thank You</p></center>
+
+        <table class="signature-table">
+            <tr>
+                <td class="signature-cell">
+                    <p style="
+    margin-bottom: 0px;
+">Yours faithfully,</p>
+                   <strong style="
+    margin-top: 0px;
+"><span id="view_from_name_close">Kevin Lazarus B</span></strong>
+                    <span id="view_from_designation_close"></span>
+                </td>
+            </tr>
+        </table>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>S.No</th>
+                    <th>Student Name</th>
+                    <th>Register Number</th>
+                    <th>Year</th>
+                    <th>Section</th>
+                </tr>
+            </thead>
+            <tbody id="view_student_rows"></tbody>
+        </table>
+    </div>
+</div>
+</div>
+
+<!-- Premium PDF result modal -->
+<div id="pdf_modal" class="modal-backdrop no-print" aria-hidden="true">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="pdf_modal_title">
+        <div id="pdf_modal_icon" class="modal-icon success">✓</div>
+        <h3 id="pdf_modal_title">PDF is ready</h3>
+        <p id="pdf_modal_message">Your On-Duty request letter has been generated successfully.</p>
+        <div class="modal-actions">
+            <button id="modal_download_btn" class="modal-primary" onclick="downloadPreparedPDF()">Download PDF</button>
+            <button id="modal_open_btn" class="modal-secondary" onclick="openPreparedPDF()">Open PDF</button>
+            <button class="modal-close" onclick="closePDFModal()">Close</button>
+        </div>
+        <p class="modal-hint">If your phone does not automatically save downloads, use <b>Open PDF</b> and choose your browser's download/share option.</p>
+    </div>
+</div>
+
+<script>
+let students=[{name:"",regNo:"",year:"",section:"A"}];
+let preparedPdfBlob=null;
+let preparedPdfUrl=null;
+
+function formatDateString(dateVal){
+    if(!dateVal) return "________";
+    const dateObj=new Date(dateVal+"T00:00:00");
+    return dateObj.toLocaleDateString("en-GB",{day:"2-digit",month:"2-digit",year:"numeric"});
+}
+
+function sameDate(a,b){
+    return !!a && !!b && a===b;
+}
+
+function getFromDetails(){
+    const mode=document.getElementById("input_from_person").value;
+
+    if(mode==="kevin"){
+        return {
+            name:"Kevin Lazarus B",
+            designation:"Technical Head"
+        };
+    }
+
+    return {
+        name:document.getElementById("input_from_name").value.trim()||"___________",
+        designation:document.getElementById("input_from_class").value.trim()||"___________"
+    };
+}
+
+function handleFromPersonChange(){
+    const other=document.getElementById("other_from_fields");
+    other.classList.toggle("hidden",document.getElementById("input_from_person").value!=="other");
+    updatePreview();
+}
+
+function updatePreview(){
+    const date=document.getElementById("input_date").value;
+    const place=document.getElementById("input_place").value||"Trichy";
+    const dept=document.getElementById("input_dept").value||"___________";
+    const college=document.getElementById("input_college").value||"___________";
+    const eventName=document.getElementById("input_event").value||"___________";
+    const organizer=document.getElementById("input_organizer").value||"___________";
+    const fromDate=document.getElementById("input_from_date").value;
+    const toDate=document.getElementById("input_to_date").value;
+    const from=getFromDetails();
+
+    document.getElementById("view_date").innerText=date?formatDateString(date):formatDateString(new Date().toISOString().slice(0,10));
+    document.getElementById("view_place").innerText=place;
+
+    document.getElementById("view_from_name").innerText=from.name;
+    document.getElementById("view_from_name_close").innerText=from.name;
+    document.getElementById("view_from_designation").innerText=from.designation;
+    document.getElementById("view_from_designation_close").innerText=from.designation;
+
+    document.getElementById("view_dept_from").innerText=dept;
+    document.getElementById("view_dept_to").innerText=dept;
+    document.getElementById("view_dept_body").innerText=dept;
+
+    document.getElementById("view_college_from").innerText=college;
+    document.getElementById("view_college_to").innerText=college;
+
+    document.getElementById("view_event_subj").innerText=eventName;
+    document.getElementById("view_event_body").innerText=eventName;
+    document.getElementById("view_organizer_body").innerText=organizer;
+
+    let dateSentence;
+    if(!fromDate && !toDate){
+        dateSentence=".";
+    }else if(sameDate(fromDate,toDate)){
+        dateSentence=` on <b>${formatDateString(fromDate)}</b>.`;
+    }else{
+        const fromText=formatDateString(fromDate);
+        const toText=formatDateString(toDate);
+        dateSentence=` from <b>${fromText}</b> to <b>${toText}</b>.`;
+    }
+    document.getElementById("view_date_sentence").innerHTML=dateSentence;
+
+    const tbody=document.getElementById("view_student_rows");
+    tbody.innerHTML="";
+
+    students.forEach((student,index)=>{
+        const row=document.createElement("tr");
+        [index+1,student.name||"",student.regNo||"",student.year||"",student.section||""].forEach(value=>{
+            const td=document.createElement("td");
+            td.textContent=value;
+            row.appendChild(td);
+        });
+        tbody.appendChild(row);
+    });
+}
+
+function showPDFModal(type,title,message){
+    const modal=document.getElementById("pdf_modal");
+    const icon=document.getElementById("pdf_modal_icon");
+    const downloadBtn=document.getElementById("modal_download_btn");
+    const openBtn=document.getElementById("modal_open_btn");
+
+    document.getElementById("pdf_modal_title").innerText=title;
+    document.getElementById("pdf_modal_message").innerText=message;
+
+    if(type==="error"){
+        icon.className="modal-icon error";
+        icon.innerText="!";
+        downloadBtn.style.display="none";
+        openBtn.style.display="none";
+    }else{
+        icon.className="modal-icon success";
+        icon.innerText="✓";
+        downloadBtn.style.display="";
+        openBtn.style.display="";
+    }
+
+    modal.classList.add("show");
+    modal.setAttribute("aria-hidden","false");
+}
+
+function closePDFModal(){
+    document.getElementById("pdf_modal").classList.remove("show");
+    document.getElementById("pdf_modal").setAttribute("aria-hidden","true");
+
+    if(preparedPdfUrl){
+        URL.revokeObjectURL(preparedPdfUrl);
+        preparedPdfUrl=null;
+    }
+    preparedPdfBlob=null;
+}
+
+function downloadPreparedPDF(){
+    if(!preparedPdfBlob) return;
+
+    if(!preparedPdfUrl){
+        preparedPdfUrl=URL.createObjectURL(preparedPdfBlob);
+    }
+
+    const link=document.createElement("a");
+    link.href=preparedPdfUrl;
+    link.download="On-Duty-Request-Letter.pdf";
+    link.rel="noopener";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+}
+
+function openPreparedPDF(){
+    if(!preparedPdfBlob) return;
+    if(!preparedPdfUrl) preparedPdfUrl=URL.createObjectURL(preparedPdfBlob);
+    window.open(preparedPdfUrl,"_blank","noopener,noreferrer");
+}
+
+async function downloadPDF(){
+    const button=document.getElementById("action_btn");
+    const original=document.getElementById("letter_body");
+
+    if(typeof window.html2canvas==="undefined" ||
+       !window.jspdf ||
+       typeof window.jspdf.jsPDF!=="function"){
+        showPDFModal(
+            "error",
+            "PDF engine unavailable",
+            "The PDF libraries did not load. Reload the page once and try again."
+        );
+        return;
+    }
+    if(!original){
+        showPDFModal("error","Letter not found","The letter content could not be found.");
+        return;
+    }
+
+    updatePreview();
+    button.disabled=true;
+    const oldText=button.innerText;
+    button.innerText="Generating PDF…";
+    let host=null;
+
+    try{
+        if(preparedPdfUrl){ URL.revokeObjectURL(preparedPdfUrl); preparedPdfUrl=null; }
+        preparedPdfBlob=null;
+
+        /*
+         * Capture a fully populated copy of the letter in a normal document
+         * layer. Hidden/off-screen clones are unreliable on Android Chrome.
+         */
+        host=document.createElement("div");
+        host.style.cssText="position:fixed;left:0;top:0;width:794px;height:1123px;background:#fff;z-index:2147483647;overflow:hidden;opacity:1;visibility:visible;pointer-events:none;";
+
+        const clone=original.cloneNode(true);
+        clone.removeAttribute("id");
+        clone.classList.remove("pdf-render");
+        clone.style.cssText="width:794px;height:1123px;min-height:1123px;margin:0;padding:83px 76px;background:#fff;color:#111827;box-shadow:none;overflow:hidden;position:relative;opacity:1;visibility:visible;font-family:'Times New Roman',serif;font-size:16px;line-height:1.55;";
+
+        host.appendChild(clone);
+        document.body.appendChild(host);
+
+        await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>setTimeout(r,250))));
+
+        const canvas=await html2canvas(clone,{
+            scale:2,
+            backgroundColor:"#ffffff",
+            useCORS:true,
+            allowTaint:false,
+            logging:false,
+            width:794,
+            height:1123,
+            windowWidth:794,
+            windowHeight:1123,
+            scrollX:0,
+            scrollY:0
+        });
+
+        if(!canvas || canvas.width<100 || canvas.height<100) throw new Error("Invalid PDF canvas");
+
+        /* Verify the canvas isn't completely white before creating the PDF. */
+        const sample=document.createElement("canvas");
+        sample.width=80; sample.height=80;
+        const ctx=sample.getContext("2d");
+        ctx.drawImage(canvas,0,0,80,80);
+        const pixels=ctx.getImageData(0,0,80,80).data;
+        let nonWhite=0;
+        for(let i=0;i<pixels.length;i+=4){
+            if(pixels[i]<245 || pixels[i+1]<245 || pixels[i+2]<245){ nonWhite++; if(nonWhite>20) break; }
+        }
+
+        /* Use the actual jsPDF object bundled by html2pdf. */
+        const jsPDF=(window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
+        if(!jsPDF) throw new Error("jsPDF is unavailable");
+
+        const pdf=new jsPDF({unit:"mm",format:"a4",orientation:"portrait",compress:true});
+        const imageData=canvas.toDataURL("image/jpeg",0.98);
+        pdf.addImage(imageData,"JPEG",0,0,210,297,undefined,"FAST");
+        preparedPdfBlob=pdf.output("blob");
+
+        if(!(preparedPdfBlob instanceof Blob) || preparedPdfBlob.size<1000 || nonWhite===0){
+            throw new Error("PDF canvas contains no visible letter content");
+        }
+
+        preparedPdfUrl=URL.createObjectURL(preparedPdfBlob);
+        showPDFModal("success","PDF is ready","The On-Duty request letter has been generated successfully. Choose Download PDF or Open PDF.");
+
+    }catch(error){
+        console.error("PDF generation failed:",error);
+        preparedPdfBlob=null;
+        showPDFModal("error","PDF generation failed","The PDF could not be generated on this device. Please reload the page and try again.");
+    }finally{
+        if(host) host.remove();
+        button.disabled=false;
+        button.innerText=oldText;
+    }
+}
+
+/* =========================
+   STUDENT INPUTS
+   ========================= */
+function escapeHtml(value){
+    return String(value||"")
+        .replaceAll("&","&amp;")
+        .replaceAll("<","&lt;")
+        .replaceAll(">","&gt;")
+        .replaceAll('"',"&quot;")
+        .replaceAll("'","&#039;");
+}
+
+function renderStudentInputs(){
+    const container=document.getElementById("student_inputs_container");
+    container.innerHTML="";
+
+    students.forEach((student,index)=>{
+        const div=document.createElement("div");
+        div.className="student-entry";
+
+        div.innerHTML=`
+            <div style="font-weight:600;margin-bottom:8px;display:flex;justify-content:space-between;color:#475569">
+                <span>Student #${index+1}</span>
+                <span style="color:#ef4444;cursor:pointer;font-weight:700" onclick="removeStudent(${index})">Remove</span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+                <input type="text" placeholder="Name"
+                    value="${escapeHtml(student.name)}"
+                    oninput="updateStudentData(${index},'name',this.value)">
+                <input type="text" placeholder="Reg No"
+                    value="${escapeHtml(student.regNo)}"
+                    oninput="updateStudentData(${index},'regNo',this.value)">
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                <input type="text" placeholder="Year"
+                    value="${escapeHtml(student.year)}"
+                    oninput="updateStudentData(${index},'year',this.value)">
+                <input type="text" placeholder="Section"
+                    value="${escapeHtml(student.section)}"
+                    oninput="updateStudentData(${index},'section',this.value)">
+            </div>
+        `;
+
+        container.appendChild(div);
+    });
+}
+
+function addStudentInput(){
+    students.push({name:"",regNo:"",year:"",section:""});
+    renderStudentInputs();
+    updatePreview();
+}
+
+function removeStudent(index){
+    if(students.length===1){
+        showPDFModal("error","Cannot remove student","At least one student entry is required.");
+        return;
+    }
+
+    students.splice(index,1);
+    renderStudentInputs();
+    updatePreview();
+}
+
+function updateStudentData(index,field,value){
+    students[index][field]=value;
+    updatePreview();
+}
+
+/* =========================
+   INITIALIZATION
+   ========================= */
+document.addEventListener("DOMContentLoaded",()=>{
+    const today=new Date();
+    const iso=today.toISOString().slice(0,10);
+
+    document.getElementById("input_date").value=iso;
+    document.getElementById("input_from_date").value=iso;
+    document.getElementById("input_to_date").value=iso;
+
+    renderStudentInputs();
+    updatePreview();
+
+    if(typeof window.html2canvas==="undefined" ||
+       !window.jspdf ||
+       typeof window.jspdf.jsPDF!=="function"){
+        console.error("PDF libraries failed to load.");
+    }else{
+        console.log("PDF libraries loaded successfully.");
+    }
+
+    document.getElementById("pdf_modal").addEventListener("click",event=>{
+        if(event.target.id==="pdf_modal") closePDFModal();
+    });
+
+    document.addEventListener("keydown",event=>{
+        if(event.key==="Escape") closePDFModal();
+    });
+});
+</script>
+</body>
+</html>
