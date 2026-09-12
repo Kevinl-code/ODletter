@@ -1,6 +1,5 @@
 import os
 import sqlite3
-import tempfile
 from flask import Flask, render_template, request, jsonify
 from dotenv import load_dotenv
 from google import genai
@@ -10,7 +9,6 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# Properly initialize the Gemini client using the api_key keyword argument
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 DB_FILE = "database.db"
@@ -26,8 +24,6 @@ def init_db():
             section TEXT DEFAULT 'A'
         )
     """)
-    
-    # Pre-populate with your class roster if table is empty
     cursor.execute("SELECT COUNT(*) FROM students")
     if cursor.fetchone()[0] == 0:
         roster = {
@@ -76,17 +72,9 @@ def parse_brochure():
     if file.filename == "":
         return jsonify({"error": "Empty filename"}), 400
 
-    temp_path = None
-    uploaded_file = None
     try:
-        # Save incoming Flask file storage to a secure temporary file path
-        suffix = os.path.splitext(file.filename)[1] or ".pdf"
-        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-            file.save(tmp.name)
-            temp_path = tmp.name
-
-        # Upload file via path using GenAI Files API
-        uploaded_file = client.files.upload(file=temp_path)
+        file_bytes = file.read()
+        mime_type = file.content_type or "application/pdf"
 
         prompt = """
         Extract the following event details from this document/invitation/brochure and return ONLY valid JSON:
@@ -99,9 +87,16 @@ def parse_brochure():
         }
         """
 
+        # Pass raw bytes directly using types.Part.from_bytes to avoid disk writes and file API latency
         response = client.models.generate_content(
             model="gemini-2.5-flash",
-            contents=[uploaded_file, prompt],
+            contents=[
+                types.Part.from_bytes(
+                    data=file_bytes,
+                    mime_type=mime_type,
+                ),
+                prompt,
+            ],
             config=types.GenerateContentConfig(
                 response_mime_type="application/json"
             )
@@ -110,18 +105,6 @@ def parse_brochure():
         return response.text, 200, {'Content-Type': 'application/json'}
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-    finally:
-        # Cleanup temporary local file and remote GenAI file reference
-        if temp_path and os.path.exists(temp_path):
-            try:
-                os.unlink(temp_path)
-            except Exception:
-                pass
-        if uploaded_file:
-            try:
-                client.files.delete(name=uploaded_file.name)
-            except Exception:
-                pass
 
 if __name__ == "__main__":
     init_db()
