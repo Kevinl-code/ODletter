@@ -1,7 +1,8 @@
 import os
 import io
 import re
-import sqlite3
+import csv
+import json
 from datetime import datetime
 from pathlib import Path
 
@@ -12,18 +13,30 @@ from flask import (
     request,
     send_file,
 )
+
 from dotenv import load_dotenv
 
-# Optional Gemini SDK
+
+# ============================================================
+# OPTIONAL GEMINI SDK
+# ============================================================
+
 try:
     from google import genai
 except ImportError:
     genai = None
 
-# Optional PDF library
+
+# ============================================================
+# OPTIONAL REPORTLAB
+# ============================================================
+
 try:
     from reportlab.lib.pagesizes import A4
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.styles import (
+        getSampleStyleSheet,
+        ParagraphStyle,
+    )
     from reportlab.lib.enums import TA_CENTER, TA_LEFT
     from reportlab.lib.units import mm
     from reportlab.platypus import (
@@ -36,6 +49,7 @@ try:
     from reportlab.lib import colors
 
     REPORTLAB_AVAILABLE = True
+
 except ImportError:
     REPORTLAB_AVAILABLE = False
 
@@ -46,17 +60,20 @@ except ImportError:
 
 BASE_DIR = Path(__file__).resolve().parent
 
-# Load .env only when it exists.
-# On Vercel, environment variables should be configured
-# through Vercel Project Settings.
+# IMPORTANT:
+# students.csv must be in the ROOT of your GitHub repository.
+STUDENTS_FILE = BASE_DIR / "students.csv"
+
+# Local .env is optional.
+# On Vercel, use Project Settings -> Environment Variables.
 ENV_FILE = BASE_DIR / ".env"
 
 if ENV_FILE.exists():
     load_dotenv(ENV_FILE)
 
-DATABASE_PATH = BASE_DIR / "database.db"
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
 GEMINI_MODEL = os.getenv(
     "GEMINI_MODEL",
     "gemini-2.5-flash"
@@ -80,6 +97,7 @@ app = Flask(
 
 app.secret_key = SECRET_KEY
 
+# Maximum uploaded file size = 15 MB
 app.config["MAX_CONTENT_LENGTH"] = 15 * 1024 * 1024
 
 
@@ -90,391 +108,281 @@ app.config["MAX_CONTENT_LENGTH"] = 15 * 1024 * 1024
 client = None
 
 if GEMINI_API_KEY and genai is not None:
+
     try:
+
         client = genai.Client(
             api_key=GEMINI_API_KEY
         )
+
     except Exception as exc:
-        print(f"Gemini client initialization failed: {exc}")
+
+        print(
+            f"Gemini client initialization failed: {exc}"
+        )
+
         client = None
 
 
-
-
-DEFAULT_STUDENTS = [
-    ("Student One", "DS001", "I M.Sc", "A", "", ""),
-    ("Student Two", "DS002", "I M.Sc", "A", "", ""),
-    ("Student Three", "DS003", "II M.Sc", "B", "", ""),
-]
-
-
-def get_db():
-    """
-    Open SQLite database connection.
-    """
-    connection = sqlite3.connect(
-        DATABASE_PATH,
-        timeout=10
-    )
-
-    connection.row_factory = sqlite3.Row
-
-    return connection
-
-
-def table_exists(connection, table_name):
-    """
-    Check whether a SQLite table exists.
-    """
-
-    row = connection.execute(
-        """
-        SELECT name
-        FROM sqlite_master
-        WHERE type = 'table'
-        AND name = ?
-        """,
-        (table_name,),
-    ).fetchone()
-
-    return row is not None
-
-
-def get_table_columns(connection, table_name):
-    """
-    Return existing column names for a table.
-    """
-
-    rows = connection.execute(
-        f"PRAGMA table_info({table_name})"
-    ).fetchall()
-
-    return {
-        row["name"]
-        for row in rows
-    }
-
-
-def init_db():
-    """
-    Create or migrate the students table.
-
-    This is intentionally migration-friendly so an older
-    database.db does not break when the application is updated.
-    """
-
-    try:
-        connection = get_db()
-
-        # ----------------------------------------------------
-        # Create table if it doesn't exist
-        # ----------------------------------------------------
-
-        if not table_exists(
-            connection,
-            "students"
-        ):
-            connection.execute(
-                """
-                CREATE TABLE students (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    name TEXT NOT NULL,
-                    register_number TEXT UNIQUE NOT NULL,
-                    year TEXT,
-                    section TEXT,
-                    email TEXT,
-                    phone TEXT
-                )
-                """
-            )
-
-            print(
-                "Created new students table."
-            )
-
-        else:
-            # ------------------------------------------------
-            # Existing table
-            # ------------------------------------------------
-
-            columns = get_table_columns(
-                connection,
-                "students"
-            )
-
-            print(
-                "Existing student columns:",
-                sorted(columns)
-            )
-
-            # --------------------------------------------
-            # Add missing columns
-            # --------------------------------------------
-
-            if "id" not in columns:
-                print(
-                    "WARNING: Existing students table "
-                    "does not contain an id column."
-                )
-
-                # SQLite cannot normally add a PRIMARY KEY
-                # AUTOINCREMENT column using ALTER TABLE.
-                #
-                # Therefore recreate the table while preserving
-                # the existing student data.
-
-                old_columns = columns
-
-                connection.execute(
-                    """
-                    ALTER TABLE students
-                    RENAME TO students_old
-                    """
-                )
-
-                connection.execute(
-                    """
-                    CREATE TABLE students (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        name TEXT NOT NULL,
-                        register_number TEXT UNIQUE NOT NULL,
-                        year TEXT,
-                        section TEXT,
-                        email TEXT,
-                        phone TEXT
-                    )
-                    """
-                )
-
-                old_info = connection.execute(
-                    """
-                    PRAGMA table_info(students_old)
-                    """
-                ).fetchall()
-
-                old_column_names = {
-                    row["name"]
-                    for row in old_info
-                }
-
-                # Determine which old fields can be preserved.
-                name_column = (
-                    "name"
-                    if "name" in old_column_names
-                    else None
-                )
-
-                register_column = None
-
-                if "register_number" in old_column_names:
-                    register_column = "register_number"
-
-                elif "register_no" in old_column_names:
-                    register_column = "register_no"
-
-                elif "registerNumber" in old_column_names:
-                    register_column = "registerNumber"
-
-                year_column = (
-                    "year"
-                    if "year" in old_column_names
-                    else None
-                )
-
-                section_column = (
-                    "section"
-                    if "section" in old_column_names
-                    else None
-                )
-
-                email_column = (
-                    "email"
-                    if "email" in old_column_names
-                    else None
-                )
-
-                phone_column = (
-                    "phone"
-                    if "phone" in old_column_names
-                    else None
-                )
-
-                # We can preserve the old data only if the
-                # essential columns are available.
-                if name_column and register_column:
-
-                    select_parts = [
-                        f'"{name_column}"',
-                        f'"{register_column}"',
-                        (
-                            f'"{year_column}"'
-                            if year_column
-                            else "''"
-                        ),
-                        (
-                            f'"{section_column}"'
-                            if section_column
-                            else "''"
-                        ),
-                        (
-                            f'"{email_column}"'
-                            if email_column
-                            else "''"
-                        ),
-                        (
-                            f'"{phone_column}"'
-                            if phone_column
-                            else "''"
-                        ),
-                    ]
-
-                    connection.execute(
-                        f"""
-                        INSERT OR IGNORE INTO students
-                        (
-                            name,
-                            register_number,
-                            year,
-                            section,
-                            email,
-                            phone
-                        )
-                        SELECT
-                            {", ".join(select_parts)}
-                        FROM students_old
-                        """
-                    )
-
-                # Remove temporary old table.
-                connection.execute(
-                    "DROP TABLE students_old"
-                )
-
-                print(
-                    "Migrated old students table successfully."
-                )
-
-            else:
-                # --------------------------------------------
-                # ID exists; add any other missing columns.
-                # --------------------------------------------
-
-                required_columns = {
-                    "name": "TEXT",
-                    "register_number": "TEXT",
-                    "year": "TEXT",
-                    "section": "TEXT",
-                    "email": "TEXT",
-                    "phone": "TEXT",
-                }
-
-                for column_name, column_type in (
-                    required_columns.items()
-                ):
-
-                    if column_name not in columns:
-
-                        connection.execute(
-                            f"""
-                            ALTER TABLE students
-                            ADD COLUMN {column_name}
-                            {column_type}
-                            """
-                        )
-
-                        print(
-                            f"Added missing column: "
-                            f"{column_name}"
-                        )
-
-        # ----------------------------------------------------
-        # Check whether students exist
-        # ----------------------------------------------------
-
-        count_row = connection.execute(
-            """
-            SELECT COUNT(*) AS count
-            FROM students
-            """
-        ).fetchone()
-
-        student_count = count_row["count"]
-
-        if student_count == 0:
-
-            connection.executemany(
-                """
-                INSERT OR IGNORE INTO students
-                (
-                    name,
-                    register_number,
-                    year,
-                    section,
-                    email,
-                    phone
-                )
-                VALUES (?, ?, ?, ?, ?, ?)
-                """,
-                DEFAULT_STUDENTS,
-            )
-
-            print(
-                "Inserted default students."
-            )
-
-        connection.commit()
-        connection.close()
-
-        print(
-            f"Database ready. Students: "
-            f"{student_count}"
-        )
-
-    except Exception as exc:
-
-        print(
-            "DATABASE INITIALIZATION ERROR:",
-            repr(exc)
-        )
-
-        try:
-            connection.rollback()
-            connection.close()
-        except Exception:
-            pass
-
-# Initialize when the module is imported by Vercel.
-init_db()
-
-
 # ============================================================
-# HELPERS
+# CSV STUDENT DATABASE
 # ============================================================
 
 def clean_text(value):
     """
     Safely convert a value to a trimmed string.
     """
+
     if value is None:
         return ""
 
     return str(value).strip()
 
 
+def get_students():
+    """
+    Read students from students.csv.
+
+    Expected CSV format:
+
+        reg_no,name,year,section
+
+    Example:
+
+        255229101,ABDUL RASIK S,II,A
+        255229102,ABISHEIK RUBAN C,II,A
+    """
+
+    students = []
+
+    if not STUDENTS_FILE.exists():
+
+        print(
+            f"Student CSV not found: {STUDENTS_FILE}"
+        )
+
+        return []
+
+
+    try:
+
+        with open(
+            STUDENTS_FILE,
+            "r",
+            encoding="utf-8-sig",
+            newline="",
+        ) as file:
+
+            reader = csv.DictReader(file)
+
+            if not reader.fieldnames:
+
+                print(
+                    "Student CSV has no header row."
+                )
+
+                return []
+
+
+            # Normalize column names.
+            fieldnames = [
+                clean_text(field).lower()
+                for field in reader.fieldnames
+            ]
+
+            print(
+                "Student CSV columns:",
+                fieldnames
+            )
+
+
+            # ------------------------------------------------
+            # Validate required columns
+            # ------------------------------------------------
+
+            required_columns = {
+                "reg_no",
+                "name",
+                "year",
+                "section",
+            }
+
+            missing_columns = (
+                required_columns
+                - set(fieldnames)
+            )
+
+            if missing_columns:
+
+                print(
+                    "Student CSV missing columns:",
+                    sorted(missing_columns)
+                )
+
+                return []
+
+
+            # ------------------------------------------------
+            # Read rows
+            # ------------------------------------------------
+
+            for row in reader:
+
+                # Convert keys to lowercase and trim.
+                normalized_row = {}
+
+                for key, value in row.items():
+
+                    if key is None:
+                        continue
+
+                    normalized_key = (
+                        clean_text(key).lower()
+                    )
+
+                    normalized_row[
+                        normalized_key
+                    ] = clean_text(value)
+
+
+                reg_no = clean_text(
+                    normalized_row.get("reg_no")
+                )
+
+                name = clean_text(
+                    normalized_row.get("name")
+                )
+
+                year = clean_text(
+                    normalized_row.get("year")
+                )
+
+                section = clean_text(
+                    normalized_row.get("section")
+                )
+
+
+                # Ignore completely empty rows.
+                if not reg_no and not name:
+                    continue
+
+
+                students.append(
+                    {
+                        "id": reg_no,
+                        "register_number": reg_no,
+                        "reg_no": reg_no,
+                        "name": name,
+                        "year": year,
+                        "section": section,
+                        "email": clean_text(
+                            normalized_row.get("email")
+                        ),
+                        "phone": clean_text(
+                            normalized_row.get("phone")
+                        ),
+                    }
+                )
+
+
+        # Sort alphabetically by name.
+        students.sort(
+            key=lambda student: (
+                student["name"].lower()
+            )
+        )
+
+        print(
+            f"Loaded {len(students)} students from CSV."
+        )
+
+        return students
+
+
+    except Exception as exc:
+
+        print(
+            f"Student CSV error: {exc}"
+        )
+
+        return []
+
+
+# ============================================================
+# PAGE ROUTE
+# ============================================================
+
+@app.route("/", methods=["GET"])
+def index():
+
+    students = get_students()
+
+    return render_template(
+        "index.html",
+        students=students,
+    )
+
+
+# ============================================================
+# HEALTH CHECK
+# ============================================================
+
+@app.route("/api/health", methods=["GET"])
+def health():
+
+    students = get_students()
+
+    return jsonify(
+        {
+            "success": True,
+            "service": "OD Letter Generator",
+            "gemini_configured": bool(client),
+            "reportlab_available": REPORTLAB_AVAILABLE,
+            "students_file_exists": STUDENTS_FILE.exists(),
+            "student_count": len(students),
+        }
+    )
+
+
+# ============================================================
+# STUDENT API
+# ============================================================
+
+@app.route("/api/students", methods=["GET"])
+def students_api():
+
+    students = get_students()
+
+    return jsonify(
+        {
+            "success": True,
+            "students": students,
+            "count": len(students),
+        }
+    )
+
+
+# ============================================================
+# DATE HELPERS
+# ============================================================
+
 def normalize_date(value):
     """
-    Convert common date formats to DD/MM/YYYY.
+    Convert common date formats into DD/MM/YYYY.
 
-    Accepted examples:
+    Supported:
+
         2026-09-12
         12/09/2026
         12-09-2026
+        2026/09/12
     """
 
     value = clean_text(value)
 
     if not value:
         return ""
+
 
     formats = [
         "%Y-%m-%d",
@@ -483,43 +391,83 @@ def normalize_date(value):
         "%Y/%m/%d",
     ]
 
+
     for fmt in formats:
+
         try:
-            parsed = datetime.strptime(value, fmt)
-            return parsed.strftime("%d/%m/%Y")
+
+            parsed = datetime.strptime(
+                value,
+                fmt,
+            )
+
+            return parsed.strftime(
+                "%d/%m/%Y"
+            )
+
         except ValueError:
+
             continue
+
 
     return value
 
 
-def event_date_sentence(from_date, to_date):
+def event_date_sentence(
+    from_date,
+    to_date,
+):
     """
-    Produce deterministic wording for the OD letter.
+    Generate deterministic OD wording.
+
+    Same day:
+
+        on 12/09/2026
+
+    Multiple days:
+
+        from 12/09/2026 to 14/09/2026
     """
 
-    from_date = normalize_date(from_date)
-    to_date = normalize_date(to_date)
+    from_date = normalize_date(
+        from_date
+    )
+
+    to_date = normalize_date(
+        to_date
+    )
+
 
     if not from_date:
+
         return "on the specified date"
 
-    if not to_date or from_date == to_date:
+
+    if (
+        not to_date
+        or from_date == to_date
+    ):
+
         return f"on {from_date}"
 
-    return f"from {from_date} to {to_date}"
 
+    return (
+        f"from {from_date} "
+        f"to {to_date}"
+    )
+
+
+# ============================================================
+# GEMINI JSON EXTRACTION
+# ============================================================
 
 def extract_json_from_text(text):
-    """
-    Gemini occasionally returns JSON surrounded by markdown.
-    Extract the JSON object safely.
-    """
 
     text = clean_text(text)
 
     if not text:
         return {}
+
 
     # Remove markdown code fences.
     text = re.sub(
@@ -538,231 +486,56 @@ def extract_json_from_text(text):
 
     text = text.strip()
 
-    # Import json only here.
-    import json
 
     try:
+
         return json.loads(text)
+
     except json.JSONDecodeError:
+
         pass
 
-    # Try to locate the first JSON object.
+
+    # Try finding JSON object inside response.
     match = re.search(
         r"\{.*\}",
         text,
         flags=re.DOTALL,
     )
 
+
     if match:
+
         try:
-            return json.loads(match.group(0))
+
+            return json.loads(
+                match.group(0)
+            )
+
         except json.JSONDecodeError:
+
             pass
 
+
     return {}
-
-
-def get_students_from_database():
-    """
-    Return all students as dictionaries.
-    """
-
-    try:
-        connection = get_db()
-
-        rows = connection.execute(
-            """
-            SELECT
-                id,
-                name,
-                register_number,
-                year,
-                section,
-                email,
-                phone
-            FROM students
-            ORDER BY name ASC
-            """
-        ).fetchall()
-
-        connection.close()
-
-        return [
-            dict(row)
-            for row in rows
-        ]
-
-    except Exception as exc:
-        print(f"Student database error: {exc}")
-        return []
-
-
-# ============================================================
-# PAGE ROUTE
-# ============================================================
-
-@app.route("/", methods=["GET"])
-def index():
-    """
-    Render the main OD Letter Generator page.
-    """
-
-    students = get_students_from_database()
-
-    return render_template(
-        "index.html",
-        students=students,
-    )
-
-
-# ============================================================
-# HEALTH CHECK
-# ============================================================
-
-@app.route("/api/health", methods=["GET"])
-def health():
-    """
-    Simple deployment health endpoint.
-    """
-
-    return jsonify(
-        {
-            "success": True,
-            "service": "OD Letter Generator",
-            "gemini_configured": bool(client),
-            "reportlab_available": REPORTLAB_AVAILABLE,
-        }
-    )
-
-
-# ============================================================
-# STUDENT API
-# ============================================================
-
-@app.route("/api/students", methods=["GET"])
-def students_api():
-    """
-    Return all students.
-    """
-
-    students = get_students_from_database()
-
-    return jsonify(
-        {
-            "success": True,
-            "students": students,
-            "count": len(students),
-        }
-    )
-
-
-# ============================================================
-# ADD STUDENT
-# ============================================================
-
-@app.route("/api/students", methods=["POST"])
-def add_student():
-    """
-    Add one student.
-    """
-
-    data = request.get_json(silent=True) or {}
-
-    name = clean_text(data.get("name"))
-    register_number = clean_text(
-        data.get("register_number")
-        or data.get("registerNumber")
-    )
-    year = clean_text(data.get("year"))
-    section = clean_text(data.get("section"))
-    email = clean_text(data.get("email"))
-    phone = clean_text(data.get("phone"))
-
-    if not name or not register_number:
-        return jsonify(
-            {
-                "success": False,
-                "error": "Name and register number are required.",
-            }
-        ), 400
-
-    try:
-        connection = get_db()
-
-        cursor = connection.execute(
-            """
-            INSERT INTO students
-            (
-                name,
-                register_number,
-                year,
-                section,
-                email,
-                phone
-            )
-            VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            (
-                name,
-                register_number,
-                year,
-                section,
-                email,
-                phone,
-            ),
-        )
-
-        connection.commit()
-
-        student_id = cursor.lastrowid
-
-        connection.close()
-
-        return jsonify(
-            {
-                "success": True,
-                "message": "Student added successfully.",
-                "id": student_id,
-            }
-        )
-
-    except sqlite3.IntegrityError:
-        return jsonify(
-            {
-                "success": False,
-                "error": "Register number already exists.",
-            }
-        ), 409
-
-    except Exception as exc:
-        print(f"Add student error: {exc}")
-
-        return jsonify(
-            {
-                "success": False,
-                "error": "Unable to add student.",
-            }
-        ), 500
 
 
 # ============================================================
 # BROCHURE / INVITATION EXTRACTION
 # ============================================================
 
-@app.route("/api/parse-brochure", methods=["POST"])
+@app.route(
+    "/api/parse-brochure",
+    methods=["POST"],
+)
 def parse_brochure():
-    """
-    Extract event details from an uploaded brochure/invitation.
 
-    Expected fields:
-        event_name
-        organizer
-        from_date
-        to_date
-        place
-    """
+    # --------------------------------------------------------
+    # Check uploaded file
+    # --------------------------------------------------------
 
     if "file" not in request.files:
+
         return jsonify(
             {
                 "success": False,
@@ -770,31 +543,47 @@ def parse_brochure():
             }
         ), 400
 
+
     uploaded_file = request.files["file"]
 
+
     if not uploaded_file.filename:
+
         return jsonify(
             {
                 "success": False,
-                "error": "Uploaded file has no filename.",
+                "error": (
+                    "Uploaded file has no filename."
+                ),
             }
         ), 400
 
+
+    # --------------------------------------------------------
+    # Check Gemini
+    # --------------------------------------------------------
+
     if client is None:
+
         return jsonify(
             {
                 "success": False,
                 "error": (
                     "Gemini is not configured. "
-                    "Add GEMINI_API_KEY in Vercel Environment Variables."
+                    "Add GEMINI_API_KEY in "
+                    "Vercel Environment Variables."
                 ),
             }
         ), 503
 
+
     try:
+
         file_bytes = uploaded_file.read()
 
+
         if not file_bytes:
+
             return jsonify(
                 {
                     "success": False,
@@ -802,20 +591,27 @@ def parse_brochure():
                 }
             ), 400
 
+
         mime_type = (
             uploaded_file.mimetype
             or "application/pdf"
         )
 
+
+        # ----------------------------------------------------
+        # Extraction prompt
+        # ----------------------------------------------------
+
         prompt = """
 You are an event-information extraction system.
 
 Extract ONLY information explicitly available in the
-uploaded invitation, brochure, circular, or event document.
+uploaded invitation, brochure, circular, notice,
+workshop document, seminar document, or event document.
 
 Return ONLY valid JSON.
 
-Required JSON structure:
+Required structure:
 
 {
   "event_name": "",
@@ -828,28 +624,37 @@ Required JSON structure:
 Rules:
 
 1. event_name:
-   Exact or closest clear event/workshop/seminar name.
+   Extract the exact event/workshop/seminar/conference name.
 
 2. organizer:
-   Institution, department, organization, club, company,
-   or other organizer explicitly mentioned.
+   Extract the institution, department, organization,
+   company, club, or other organizer.
 
 3. from_date:
-   Event starting date.
+   Extract the starting date.
 
 4. to_date:
-   Event ending date.
-   If it is a one-day event, use the same date.
+   Extract the ending date.
 
-5. place:
-   Venue/location where the event occurs.
+5. For a one-day event:
+   from_date and to_date must contain the same date.
 
-6. Never invent missing information.
+6. place:
+   Extract the event venue/location.
 
-7. If a field cannot be determined, return an empty string.
+7. Never invent information.
 
-8. Use dates in YYYY-MM-DD format whenever possible.
+8. If a value is unavailable, return an empty string.
+
+9. Prefer YYYY-MM-DD for dates.
+
+10. Return JSON only.
 """
+
+
+        # ----------------------------------------------------
+        # Gemini
+        # ----------------------------------------------------
 
         response = client.models.generate_content(
             model=GEMINI_MODEL,
@@ -871,27 +676,64 @@ Rules:
             ],
         )
 
-        extracted = extract_json_from_text(
-            getattr(response, "text", "")
+
+        response_text = getattr(
+            response,
+            "text",
+            "",
         )
+
+
+        extracted = extract_json_from_text(
+            response_text
+        )
+
 
         result = {
             "event_name": clean_text(
-                extracted.get("event_name")
+                extracted.get(
+                    "event_name",
+                    ""
+                )
             ),
             "organizer": clean_text(
-                extracted.get("organizer")
+                extracted.get(
+                    "organizer",
+                    ""
+                )
             ),
             "from_date": clean_text(
-                extracted.get("from_date")
+                extracted.get(
+                    "from_date",
+                    ""
+                )
             ),
             "to_date": clean_text(
-                extracted.get("to_date")
+                extracted.get(
+                    "to_date",
+                    ""
+                )
             ),
             "place": clean_text(
-                extracted.get("place")
+                extracted.get(
+                    "place",
+                    ""
+                )
             ),
         }
+
+
+        # If Gemini gave only one date,
+        # treat it as a one-day event.
+        if (
+            result["from_date"]
+            and not result["to_date"]
+        ):
+
+            result["to_date"] = (
+                result["from_date"]
+            )
+
 
         return jsonify(
             {
@@ -900,15 +742,20 @@ Rules:
             }
         )
 
+
     except Exception as exc:
-        print(f"Brochure extraction error: {exc}")
+
+        print(
+            f"Brochure extraction error: {exc}"
+        )
 
         return jsonify(
             {
                 "success": False,
                 "error": (
                     "Unable to extract event details. "
-                    "Check the uploaded file and Gemini configuration."
+                    "Check the uploaded file and "
+                    "Gemini configuration."
                 ),
             }
         ), 500
@@ -918,15 +765,18 @@ Rules:
 # SERVER-SIDE PDF GENERATION
 # ============================================================
 
-@app.route("/api/generate-pdf", methods=["POST"])
+@app.route(
+    "/api/generate-pdf",
+    methods=["POST"],
+)
 def generate_pdf():
-    """
-    Generate an OD letter PDF on the server.
 
-    This avoids relying on browser-side html2canvas/jsPDF.
-    """
+    # --------------------------------------------------------
+    # ReportLab availability
+    # --------------------------------------------------------
 
     if not REPORTLAB_AVAILABLE:
+
         return jsonify(
             {
                 "success": False,
@@ -937,7 +787,15 @@ def generate_pdf():
             }
         ), 503
 
-    data = request.get_json(silent=True) or {}
+
+    # --------------------------------------------------------
+    # Read JSON
+    # --------------------------------------------------------
+
+    data = request.get_json(
+        silent=True
+    ) or {}
+
 
     event_name = clean_text(
         data.get("event_name")
@@ -983,10 +841,21 @@ def generate_pdf():
         []
     )
 
-    if not isinstance(selected_students, list):
+
+    if not isinstance(
+        selected_students,
+        list,
+    ):
+
         selected_students = []
 
+
+    # --------------------------------------------------------
+    # Validation
+    # --------------------------------------------------------
+
     if not event_name:
+
         return jsonify(
             {
                 "success": False,
@@ -994,24 +863,31 @@ def generate_pdf():
             }
         ), 400
 
+
     if not selected_students:
+
         return jsonify(
             {
                 "success": False,
-                "error": "Select at least one student.",
+                "error": (
+                    "Select at least one student."
+                ),
             }
         ), 400
+
 
     date_sentence = event_date_sentence(
         from_date,
         to_date,
     )
 
+
     # --------------------------------------------------------
-    # Build PDF in memory
+    # Create PDF in memory
     # --------------------------------------------------------
 
     pdf_buffer = io.BytesIO()
+
 
     document = SimpleDocTemplate(
         pdf_buffer,
@@ -1024,7 +900,9 @@ def generate_pdf():
         author="OD Letter Generator",
     )
 
+
     styles = getSampleStyleSheet()
+
 
     title_style = ParagraphStyle(
         "ODTitle",
@@ -1035,6 +913,15 @@ def generate_pdf():
         spaceAfter=10,
     )
 
+
+    department_style = ParagraphStyle(
+        "Department",
+        parent=title_style,
+        fontSize=12,
+        leading=16,
+    )
+
+
     body_style = ParagraphStyle(
         "ODBody",
         parent=styles["BodyText"],
@@ -1044,17 +931,16 @@ def generate_pdf():
         spaceAfter=10,
     )
 
-    small_style = ParagraphStyle(
-        "ODSmall",
-        parent=styles["BodyText"],
-        fontSize=9,
-        leading=12,
-    )
+
+    # --------------------------------------------------------
+    # Story
+    # --------------------------------------------------------
 
     story = []
 
+
     # --------------------------------------------------------
-    # Header
+    # College header
     # --------------------------------------------------------
 
     story.append(
@@ -1064,17 +950,14 @@ def generate_pdf():
         )
     )
 
+
     story.append(
         Paragraph(
             f"<b>{department}</b>",
-            ParagraphStyle(
-                "Dept",
-                parent=title_style,
-                fontSize=12,
-                leading=16,
-            ),
+            department_style,
         )
     )
+
 
     story.append(
         Spacer(
@@ -1083,12 +966,14 @@ def generate_pdf():
         )
     )
 
+
     story.append(
         Paragraph(
             "<b>ON-DUTY REQUEST</b>",
             title_style,
         )
     )
+
 
     story.append(
         Spacer(
@@ -1097,15 +982,17 @@ def generate_pdf():
         )
     )
 
+
     # --------------------------------------------------------
     # From
     # --------------------------------------------------------
 
     from_block = (
-        f"<b>From</b><br/>"
+        "<b>From</b><br/>"
         f"{from_name}<br/>"
         f"{designation}"
     )
+
 
     story.append(
         Paragraph(
@@ -1114,12 +1001,6 @@ def generate_pdf():
         )
     )
 
-    story.append(
-        Spacer(
-            1,
-            4,
-        )
-    )
 
     # --------------------------------------------------------
     # To
@@ -1135,21 +1016,17 @@ def generate_pdf():
         )
     )
 
-    story.append(
-        Spacer(
-            1,
-            6,
-        )
-    )
 
     # --------------------------------------------------------
     # Subject
     # --------------------------------------------------------
 
     subject = (
-        f"<b>Subject:</b> Request for On-Duty permission "
-        f"to attend {event_name}"
+        "<b>Subject:</b> Request for "
+        "On-Duty permission to attend "
+        f"{event_name}"
     )
+
 
     story.append(
         Paragraph(
@@ -1158,6 +1035,7 @@ def generate_pdf():
         )
     )
 
+
     story.append(
         Spacer(
             1,
@@ -1165,40 +1043,61 @@ def generate_pdf():
         )
     )
 
+
     # --------------------------------------------------------
     # Event details
     # --------------------------------------------------------
 
     event_details = []
 
+
     if event_name:
-        event_details.append(
-            ["Event", event_name]
-        )
 
-    if organizer:
-        event_details.append(
-            ["Organizer", organizer]
-        )
-
-    if place:
-        event_details.append(
-            ["Venue", place]
-        )
-
-    if from_date:
         event_details.append(
             [
-                "Date",
-                date_sentence.replace(
-                    "on ",
-                    "",
-                    1,
-                ),
+                "Event",
+                event_name,
             ]
         )
 
+
+    if organizer:
+
+        event_details.append(
+            [
+                "Organizer",
+                organizer,
+            ]
+        )
+
+
+    if place:
+
+        event_details.append(
+            [
+                "Venue",
+                place,
+            ]
+        )
+
+
+    if from_date:
+
+        display_date = (
+            date_sentence
+            .replace("on ", "", 1)
+        )
+
+        event_details.append(
+            [
+                "Date",
+                display_date,
+            ]
+        )
+
+
     if event_details:
+
         table = Table(
             event_details,
             colWidths=[
@@ -1206,6 +1105,7 @@ def generate_pdf():
                 115 * mm,
             ],
         )
+
 
         table.setStyle(
             TableStyle(
@@ -1269,7 +1169,9 @@ def generate_pdf():
             )
         )
 
+
         story.append(table)
+
 
         story.append(
             Spacer(
@@ -1277,6 +1179,7 @@ def generate_pdf():
                 12,
             )
         )
+
 
     # --------------------------------------------------------
     # Student table
@@ -1290,22 +1193,41 @@ def generate_pdf():
         ]
     ]
 
+
     for index, student in enumerate(
         selected_students,
         start=1,
     ):
-        if isinstance(student, dict):
+
+        if isinstance(
+            student,
+            dict,
+        ):
+
             student_name = clean_text(
                 student.get("name")
             )
 
             register_number = clean_text(
-                student.get("register_number")
-                or student.get("registerNumber")
+                student.get(
+                    "register_number"
+                )
+                or student.get(
+                    "reg_no"
+                )
+                or student.get(
+                    "registerNumber"
+                )
             )
+
         else:
-            student_name = clean_text(student)
+
+            student_name = clean_text(
+                student
+            )
+
             register_number = ""
+
 
         student_rows.append(
             [
@@ -1314,6 +1236,7 @@ def generate_pdf():
                 register_number,
             ]
         )
+
 
     student_table = Table(
         student_rows,
@@ -1324,6 +1247,7 @@ def generate_pdf():
         ],
         repeatRows=1,
     )
+
 
     student_table.setStyle(
         TableStyle(
@@ -1381,7 +1305,11 @@ def generate_pdf():
         )
     )
 
-    story.append(student_table)
+
+    story.append(
+        student_table
+    )
+
 
     story.append(
         Spacer(
@@ -1390,27 +1318,37 @@ def generate_pdf():
         )
     )
 
+
     # --------------------------------------------------------
     # Request paragraph
     # --------------------------------------------------------
 
     request_text = (
-        f"I kindly request that the above-mentioned student(s) "
-        f"be permitted to attend <b>{event_name}</b> "
+        "I kindly request that the "
+        "above-mentioned student(s) "
+        f"be permitted to attend "
+        f"<b>{event_name}</b> "
         f"{date_sentence}"
     )
 
+
     if place:
+
         request_text += (
             f" at <b>{place}</b>"
         )
 
+
     if organizer:
+
         request_text += (
-            f", organized by <b>{organizer}</b>"
+            f", organized by "
+            f"<b>{organizer}</b>"
         )
 
+
     request_text += "."
+
 
     story.append(
         Paragraph(
@@ -1419,12 +1357,14 @@ def generate_pdf():
         )
     )
 
+
     story.append(
         Spacer(
             1,
             25,
         )
     )
+
 
     # --------------------------------------------------------
     # Signature
@@ -1437,12 +1377,14 @@ def generate_pdf():
         )
     )
 
+
     story.append(
         Spacer(
             1,
             18,
         )
     )
+
 
     story.append(
         Paragraph(
@@ -1454,13 +1396,22 @@ def generate_pdf():
         )
     )
 
+
     # --------------------------------------------------------
-    # Build
+    # Build PDF
     # --------------------------------------------------------
 
-    document.build(story)
+    document.build(
+        story
+    )
+
 
     pdf_buffer.seek(0)
+
+
+    # --------------------------------------------------------
+    # Safe filename
+    # --------------------------------------------------------
 
     safe_event_name = re.sub(
         r"[^A-Za-z0-9_-]+",
@@ -1468,9 +1419,13 @@ def generate_pdf():
         event_name,
     ).strip("_")
 
+
     filename = (
-        f"OD_Letter_{safe_event_name or 'Event'}.pdf"
+        "OD_Letter_"
+        f"{safe_event_name or 'Event'}"
+        ".pdf"
     )
+
 
     return send_file(
         pdf_buffer,
@@ -1486,6 +1441,7 @@ def generate_pdf():
 
 @app.errorhandler(404)
 def not_found(error):
+
     return jsonify(
         {
             "success": False,
@@ -1496,17 +1452,24 @@ def not_found(error):
 
 @app.errorhandler(413)
 def file_too_large(error):
+
     return jsonify(
         {
             "success": False,
-            "error": "Uploaded file is too large. Maximum size is 15 MB.",
+            "error": (
+                "Uploaded file is too large. "
+                "Maximum size is 15 MB."
+            ),
         }
     ), 413
 
 
 @app.errorhandler(500)
 def internal_error(error):
-    print(f"Internal server error: {error}")
+
+    print(
+        f"Internal server error: {error}"
+    )
 
     return jsonify(
         {
@@ -1521,13 +1484,48 @@ def internal_error(error):
 # ============================================================
 
 if __name__ == "__main__":
-    print("--------------------------------------------")
-    print("OD Letter Generator")
-    print("--------------------------------------------")
-    print(f"Database : {DATABASE_PATH}")
-    print(f"Gemini   : {'Configured' if client else 'Not configured'}")
-    print(f"ReportLab: {'Available' if REPORTLAB_AVAILABLE else 'Missing'}")
-    print("--------------------------------------------")
+
+    print(
+        "--------------------------------------------"
+    )
+
+    print(
+        "OD Letter Generator"
+    )
+
+    print(
+        "--------------------------------------------"
+    )
+
+    print(
+        f"Students CSV : {STUDENTS_FILE}"
+    )
+
+    print(
+        "Students CSV exists:",
+        STUDENTS_FILE.exists()
+    )
+
+    students = get_students()
+
+    print(
+        f"Students loaded: {len(students)}"
+    )
+
+    print(
+        f"Gemini       : "
+        f"{'Configured' if client else 'Not configured'}"
+    )
+
+    print(
+        f"ReportLab    : "
+        f"{'Available' if REPORTLAB_AVAILABLE else 'Missing'}"
+    )
+
+    print(
+        "--------------------------------------------"
+    )
+
 
     app.run(
         host="127.0.0.1",
