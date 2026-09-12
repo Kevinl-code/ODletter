@@ -110,8 +110,8 @@ input:focus,select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(7
                 <div class="dropdown-menu" id="dropdown_menu" onclick="event.stopPropagation()">
                     <input type="text" class="dropdown-search-input" id="student_search" placeholder="Type to search name or reg no..." oninput="filterDropdownStudents()">
                     <div id="student_checkbox_container" style="max-height: 160px; overflow-y: auto;">
-                        {% for student %} <!-- Wait, use standard jinja loop syntax below -->
-                        {% for s in students %}
+                        {% for student in students %}
+                        
                         <label class="dropdown-option student-item" data-name="{{ s.name | lower }}" data-reg="{{ s.reg_no }}">
                             <input type="checkbox" value="{{ s.reg_no }}" data-name="{{ s.name }}" data-reg="{{ s.reg_no }}" onchange="handleStudentSelection()">
                             <span><b>{{ s.reg_no }}</b> — {{ s.name }}</span>
