@@ -11,8 +11,15 @@ if os.path.exists(".env"):
 
 app = Flask(__name__)
 
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
+client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
+
+if client is None:
+    return jsonify({
+        "error": "GEMINI_API_KEY is not configured on the server."
+    }), 500
+    
 DB_FILE = "database.db"
 
 def init_db():
