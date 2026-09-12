@@ -1,11 +1,10 @@
 import os
 import sqlite3
 import json
-from datetime import datetime
+from pathlib import Path
 
 from flask import Flask, render_template, request, jsonify
 from dotenv import load_dotenv
-
 from google import genai
 from google.genai import types
 
@@ -14,8 +13,8 @@ from google.genai import types
 # ENVIRONMENT
 # ============================================================
 
-# Load .env only when it exists.
-# This works locally and does not crash on Vercel.
+# Load .env only if it exists.
+# Never commit your real .env file to GitHub.
 if os.path.exists(".env"):
     load_dotenv()
 
@@ -26,39 +25,49 @@ if os.path.exists(".env"):
 
 app = Flask(__name__)
 
-app.config["MAX_CONTENT_LENGTH"] = 15 * 1024 * 1024  # 15 MB
-
 
 # ============================================================
 # GEMINI CONFIGURATION
 # ============================================================
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+GEMINI_MODEL = os.getenv(
+    "GEMINI_MODEL",
+    "gemini-2.5-flash"
+)
 
-# Do NOT create the Gemini client if the API key is missing.
-# This prevents the entire Vercel deployment from crashing.
 client = None
 
 if GEMINI_API_KEY:
-    try:
-        client = genai.Client(api_key=GEMINI_API_KEY)
-    except Exception:
-        client = None
+    client = genai.Client(
+        api_key=GEMINI_API_KEY
+    )
 
 
 # ============================================================
-# DATABASE
+# DATABASE CONFIGURATION
 # ============================================================
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# Vercel uses serverless instances.
+# /tmp is writable during the lifetime of an instance.
+#
+# Local:
+#     database.db
+#
+# Vercel:
+#     /tmp/odletter_database.db
 
-# Local development database.
-DB_FILE = os.path.join(BASE_DIR, "database.db")
+if os.getenv("VERCEL") == "1":
+    DB_FILE = "/tmp/odletter_database.db"
+else:
+    DB_FILE = os.getenv(
+        "DB_FILE",
+        "database.db"
+    )
 
 
 # ============================================================
-# DEFAULT STUDENT ROSTER
+# STUDENT ROSTER
 # ============================================================
 
 ROSTER = {
@@ -128,25 +137,24 @@ ROSTER = {
 
 
 # ============================================================
-# DATABASE FUNCTIONS
+# DATABASE INITIALIZATION
 # ============================================================
 
-def get_db_connection():
-    """
-    Create a SQLite connection.
-    """
-    connection = sqlite3.connect(DB_FILE)
-    connection.row_factory = sqlite3.Row
-    return connection
-
-
 def init_db():
-    """
-    Create the students table and insert the default roster.
-    """
+    """Create and seed the student database."""
+
+    db_path = Path(DB_FILE)
+
+    # Create parent directory if necessary.
+    if db_path.parent and str(db_path.parent) != ".":
+        db_path.parent.mkdir(
+            parents=True,
+            exist_ok=True
+        )
+
+    conn = sqlite3.connect(DB_FILE)
 
     try:
-        conn = get_db_connection()
         cursor = conn.cursor()
 
         cursor.execute(
@@ -160,51 +168,61 @@ def init_db():
             """
         )
 
-        cursor.execute("SELECT COUNT(*) FROM students")
-        count = cursor.fetchone()[0]
-
-        if count == 0:
-            for reg_no, name in ROSTER.items():
-                cursor.execute(
-                    """
-                    INSERT OR REPLACE INTO students
-                    (reg_no, name, year, section)
-                    VALUES (?, ?, ?, ?)
-                    """,
-                    (
-                        reg_no,
-                        name,
-                        "II",
-                        "A",
-                    ),
+        for reg_no, name in ROSTER.items():
+            cursor.execute(
+                """
+                INSERT OR REPLACE INTO students
+                (reg_no, name, year, section)
+                VALUES (?, ?, ?, ?)
+                """,
+                (
+                    reg_no,
+                    name,
+                    "II",
+                    "A"
                 )
+            )
 
         conn.commit()
+
+    finally:
         conn.close()
 
-        return True
 
-    except Exception as exc:
-        print("Database initialization warning:", exc)
-        return False
+# ============================================================
+# INITIALIZE DATABASE
+# ============================================================
+
+# This is intentionally outside a route so Vercel initializes
+# the database when it imports app.py.
+
+try:
+    init_db()
+except Exception as e:
+    print(
+        f"Database initialization warning: {e}"
+    )
 
 
-def get_students():
-    """
-    Get students from SQLite.
+# ============================================================
+# HOME PAGE
+# ============================================================
 
-    If SQLite is unavailable, return the built-in roster.
-    This is useful for Vercel/serverless deployment.
-    """
+@app.route("/")
+def index():
 
     try:
-        init_db()
+        conn = sqlite3.connect(DB_FILE)
 
-        conn = get_db_connection()
+        conn.row_factory = sqlite3.Row
 
-        rows = conn.execute(
+        students = conn.execute(
             """
-            SELECT reg_no, name, year, section
+            SELECT
+                reg_no,
+                name,
+                year,
+                section
             FROM students
             ORDER BY reg_no ASC
             """
@@ -212,108 +230,112 @@ def get_students():
 
         conn.close()
 
-        if rows:
-            return [
-                {
-                    "reg_no": row["reg_no"],
-                    "name": row["name"],
-                    "year": row["year"],
-                    "section": row["section"],
-                }
-                for row in rows
-            ]
+        return render_template(
+            "index.html",
+            students=students
+        )
 
-    except Exception as exc:
-        print("Student database warning:", exc)
+    except Exception as e:
 
-    # Fallback roster
-    return [
-        {
-            "reg_no": reg_no,
-            "name": name,
-            "year": "II",
-            "section": "A",
-        }
-        for reg_no, name in sorted(ROSTER.items())
-    ]
-
-
-# ============================================================
-# HOME PAGE
-# ============================================================
-
-@app.route("/", methods=["GET"])
-def index():
-    """
-    Render the OD Letter Generator.
-    """
-
-    students = get_students()
-
-    return render_template(
-        "index.html",
-        students=students
-    )
+        return (
+            f"Database error while loading students: {e}",
+            500
+        )
 
 
 # ============================================================
 # HEALTH CHECK
 # ============================================================
 
-@app.route("/health", methods=["GET"])
+@app.route(
+    "/api/health",
+    methods=["GET"]
+)
 def health():
-    """
-    Simple deployment health check.
-    """
 
     return jsonify(
         {
             "status": "ok",
             "service": "OD Letter Generator",
-            "timestamp": datetime.utcnow().isoformat() + "Z",
-            "gemini_configured": bool(GEMINI_API_KEY),
-            "gemini_client_ready": client is not None,
+            "gemini_configured": bool(
+                GEMINI_API_KEY
+            ),
+            "gemini_model": GEMINI_MODEL
         }
     ), 200
 
 
 # ============================================================
-# STUDENT API
+# GET STUDENTS API
 # ============================================================
 
-@app.route("/api/students", methods=["GET"])
-def api_students():
-    """
-    Return all students as JSON.
-    """
+@app.route(
+    "/api/students",
+    methods=["GET"]
+)
+def get_students():
 
-    students = get_students()
+    try:
 
-    return jsonify(
-        {
-            "success": True,
-            "count": len(students),
-            "students": students,
-        }
-    ), 200
+        conn = sqlite3.connect(DB_FILE)
+
+        conn.row_factory = sqlite3.Row
+
+        rows = conn.execute(
+            """
+            SELECT
+                reg_no,
+                name,
+                year,
+                section
+            FROM students
+            ORDER BY reg_no ASC
+            """
+        ).fetchall()
+
+        conn.close()
+
+        students = [
+            dict(row)
+            for row in rows
+        ]
+
+        return jsonify(
+            {
+                "success": True,
+                "students": students
+            }
+        ), 200
+
+    except Exception as e:
+
+        return jsonify(
+            {
+                "success": False,
+                "error": (
+                    "Unable to load students: "
+                    + str(e)
+                )
+            }
+        ), 500
 
 
 # ============================================================
-# GEMINI DOCUMENT EXTRACTION
+# BROCHURE / INVITATION PARSER
 # ============================================================
 
-@app.route("/api/parse-brochure", methods=["POST"])
+@app.route(
+    "/api/parse-brochure",
+    methods=["POST"]
+)
 def parse_brochure():
-    """
-    Extract event information from an uploaded
-    invitation, brochure, notice or PDF.
-    """
 
     # --------------------------------------------------------
-    # Check uploaded file
+    # CHECK FILE
     # --------------------------------------------------------
 
     if "file" not in request.files:
+
         return jsonify(
             {
                 "success": False,
@@ -323,338 +345,241 @@ def parse_brochure():
 
     file = request.files["file"]
 
-    if file is None:
-        return jsonify(
-            {
-                "success": False,
-                "error": "Invalid uploaded file."
-            }
-        ), 400
+    if not file or file.filename == "":
 
-    if not file.filename:
-        return jsonify(
-            {
-                "success": False,
-                "error": "Empty filename."
-            }
-        ), 400
-
-    # --------------------------------------------------------
-    # Check Gemini
-    # --------------------------------------------------------
-
-    if client is None:
         return jsonify(
             {
                 "success": False,
                 "error": (
-                    "Gemini API is not configured. "
-                    "Add GEMINI_API_KEY to Vercel Environment Variables."
+                    "The uploaded file has "
+                    "no filename."
+                )
+            }
+        ), 400
+
+    # --------------------------------------------------------
+    # CHECK GEMINI
+    # --------------------------------------------------------
+
+    if client is None:
+
+        return jsonify(
+            {
+                "success": False,
+                "error": (
+                    "GEMINI_API_KEY is not configured "
+                    "on the server. Add GEMINI_API_KEY "
+                    "to Vercel Environment Variables "
+                    "and redeploy."
                 )
             }
         ), 500
 
     # --------------------------------------------------------
-    # Validate extension
-    # --------------------------------------------------------
-
-    filename = file.filename.lower()
-
-    allowed_extensions = {
-        ".pdf",
-        ".png",
-        ".jpg",
-        ".jpeg",
-        ".webp",
-    }
-
-    extension = os.path.splitext(filename)[1]
-
-    if extension not in allowed_extensions:
-        return jsonify(
-            {
-                "success": False,
-                "error": (
-                    "Unsupported file type. "
-                    "Use PDF, PNG, JPG, JPEG or WEBP."
-                )
-            }
-        ), 400
-
-    # --------------------------------------------------------
-    # Read file
+    # READ FILE
     # --------------------------------------------------------
 
     try:
+
         file_bytes = file.read()
 
         if not file_bytes:
+
             return jsonify(
                 {
                     "success": False,
-                    "error": "Uploaded file is empty."
+                    "error": "The uploaded file is empty."
                 }
             ), 400
 
-    except Exception as exc:
-        return jsonify(
-            {
-                "success": False,
-                "error": f"Could not read uploaded file: {str(exc)}"
-            }
-        ), 400
-
-    # --------------------------------------------------------
-    # MIME type
-    # --------------------------------------------------------
-
-    mime_type = file.content_type
-
-    if not mime_type:
-        mime_map = {
-            ".pdf": "application/pdf",
-            ".png": "image/png",
-            ".jpg": "image/jpeg",
-            ".jpeg": "image/jpeg",
-            ".webp": "image/webp",
-        }
-
-        mime_type = mime_map.get(
-            extension,
-            "application/octet-stream"
+        mime_type = (
+            file.content_type
+            or "application/pdf"
         )
 
-    # --------------------------------------------------------
-    # Gemini extraction prompt
-    # --------------------------------------------------------
+        # ----------------------------------------------------
+        # GEMINI EXTRACTION PROMPT
+        # ----------------------------------------------------
 
-    prompt = """
-You are an event-information extraction system for a
-college On-Duty (OD) Letter Generator.
+        prompt = """
+You are an event-document information extraction system.
 
-Read the uploaded invitation, brochure, notice or event document.
-
-Extract ONLY information that is actually present in the document.
+Extract ONLY information that is actually present in the
+uploaded invitation, brochure, circular, notice, workshop
+document, or event document.
 
 Return ONLY valid JSON.
 
-Use this exact schema:
+Use exactly these keys:
 
 {
-    "event_name": "",
-    "organizer": "",
-    "from_date": "",
-    "to_date": "",
-    "place": "",
-    "venue": "",
-    "event_type": "",
-    "description": ""
+  "event_name": "",
+  "organizer": "",
+  "from_date": "",
+  "to_date": "",
+  "place": ""
 }
 
 Rules:
 
 1. event_name:
-   Extract the official event/workshop/seminar/conference name.
+   Extract the official event, workshop, seminar, conference,
+   program, or activity name.
 
 2. organizer:
-   Extract the organization, department, college, company,
-   institution or group organizing the event.
+   Extract the organizing institution, department, club,
+   organization, company, committee, or association.
 
 3. from_date:
-   Return the starting date in YYYY-MM-DD format.
+   Extract the starting date.
+   Return YYYY-MM-DD.
+   If unavailable, return "".
 
 4. to_date:
-   Return the ending date in YYYY-MM-DD format.
-   If the event is only one day, use the same date as from_date.
+   Extract the ending date.
+   Return YYYY-MM-DD.
+   If the event is a single-day event, use the same date
+   as from_date.
+   If unavailable, return "".
 
 5. place:
-   Extract the city/location if clearly available.
+   Extract the actual venue/location.
 
-6. venue:
-   Extract the specific venue/hall/auditorium/institution
-   if available.
+6. Do NOT invent information.
 
-7. event_type:
-   Examples:
-   Event
-   Workshop
-   Seminar
-   Conference
-   Symposium
-   Hackathon
-   Competition
-   FDP
-   Training
-   Other
+7. Do NOT guess missing information.
 
-8. description:
-   Give a short factual description based only on the document.
+8. If a value cannot be determined reliably, return "".
 
-9. Never invent missing information.
+9. Return JSON only.
 
-10. If a value is unavailable, return an empty string.
+10. Do not return Markdown.
 
-11. Dates must be YYYY-MM-DD.
-
-12. Return valid JSON only.
+11. Do not include explanations.
 """
 
-    # --------------------------------------------------------
-    # Call Gemini
-    # --------------------------------------------------------
+        # ----------------------------------------------------
+        # CALL GEMINI
+        # ----------------------------------------------------
 
-    try:
         response = client.models.generate_content(
             model=GEMINI_MODEL,
             contents=[
                 types.Part.from_bytes(
                     data=file_bytes,
-                    mime_type=mime_type,
+                    mime_type=mime_type
                 ),
-                prompt,
+                prompt
             ],
             config=types.GenerateContentConfig(
                 response_mime_type="application/json"
-            ),
+            )
         )
 
-    except Exception as exc:
-        print("Gemini extraction error:", repr(exc))
+        extracted_text = (
+            response.text or ""
+        ).strip()
+
+        if not extracted_text:
+
+            return jsonify(
+                {
+                    "success": False,
+                    "error": (
+                        "Gemini returned an empty "
+                        "extraction result."
+                    )
+                }
+            ), 502
+
+        # ----------------------------------------------------
+        # PARSE JSON
+        # ----------------------------------------------------
+
+        try:
+
+            extracted_data = json.loads(
+                extracted_text
+            )
+
+        except json.JSONDecodeError:
+
+            return jsonify(
+                {
+                    "success": False,
+                    "error": (
+                        "Gemini returned invalid JSON."
+                    )
+                }
+            ), 502
+
+        # ----------------------------------------------------
+        # NORMALIZE RESPONSE
+        # ----------------------------------------------------
+
+        result = {
+            "event_name": str(
+                extracted_data.get(
+                    "event_name",
+                    ""
+                ) or ""
+            ).strip(),
+
+            "organizer": str(
+                extracted_data.get(
+                    "organizer",
+                    ""
+                ) or ""
+            ).strip(),
+
+            "from_date": str(
+                extracted_data.get(
+                    "from_date",
+                    ""
+                ) or ""
+            ).strip(),
+
+            "to_date": str(
+                extracted_data.get(
+                    "to_date",
+                    ""
+                ) or ""
+            ).strip(),
+
+            "place": str(
+                extracted_data.get(
+                    "place",
+                    ""
+                ) or ""
+            ).strip()
+        }
+
+        return jsonify(
+            {
+                "success": True,
+                "data": result
+            }
+        ), 200
+
+    # --------------------------------------------------------
+    # ERROR HANDLING
+    # --------------------------------------------------------
+
+    except Exception as e:
+
+        print(
+            f"Brochure extraction error: {e}"
+        )
 
         return jsonify(
             {
                 "success": False,
                 "error": (
-                    "Gemini could not process the document. "
-                    f"{str(exc)}"
+                    "Brochure extraction failed: "
+                    + str(e)
                 )
             }
         ), 500
-
-    # --------------------------------------------------------
-    # Read Gemini response
-    # --------------------------------------------------------
-
-    try:
-        response_text = response.text
-
-        if not response_text:
-            return jsonify(
-                {
-                    "success": False,
-                    "error": "Gemini returned an empty response."
-                }
-            ), 500
-
-        # Remove accidental markdown code fences.
-        cleaned = response_text.strip()
-
-        if cleaned.startswith("```json"):
-            cleaned = cleaned[7:]
-
-        elif cleaned.startswith("```"):
-            cleaned = cleaned[3:]
-
-        if cleaned.endswith("```"):
-            cleaned = cleaned[:-3]
-
-        cleaned = cleaned.strip()
-
-        # Validate JSON before returning.
-        extracted_data = json.loads(cleaned)
-
-    except json.JSONDecodeError:
-        print("Invalid Gemini JSON:", response_text)
-
-        return jsonify(
-            {
-                "success": False,
-                "error": "Gemini returned invalid JSON.",
-                "raw_response": response_text,
-            }
-        ), 500
-
-    except Exception as exc:
-        return jsonify(
-            {
-                "success": False,
-                "error": f"Could not read Gemini response: {str(exc)}"
-            }
-        ), 500
-
-    # --------------------------------------------------------
-    # Normalize expected fields
-    # --------------------------------------------------------
-
-    fields = [
-        "event_name",
-        "organizer",
-        "from_date",
-        "to_date",
-        "place",
-        "venue",
-        "event_type",
-        "description",
-    ]
-
-    normalized = {}
-
-    for field in fields:
-        value = extracted_data.get(field, "")
-
-        if value is None:
-            value = ""
-
-        normalized[field] = str(value).strip()
-
-    # If only from_date exists, use it as to_date.
-    if normalized["from_date"] and not normalized["to_date"]:
-        normalized["to_date"] = normalized["from_date"]
-
-    # --------------------------------------------------------
-    # Return successful response
-    # --------------------------------------------------------
-
-    return jsonify(
-        {
-            "success": True,
-            "data": normalized,
-        }
-    ), 200
-
-
-# ============================================================
-# GLOBAL ERROR HANDLERS
-# ============================================================
-
-@app.errorhandler(413)
-def file_too_large(error):
-    return jsonify(
-        {
-            "success": False,
-            "error": "File is too large. Maximum size is 15 MB."
-        }
-    ), 413
-
-
-@app.errorhandler(404)
-def not_found(error):
-    return jsonify(
-        {
-            "success": False,
-            "error": "Route not found."
-        }
-    ), 404
-
-
-@app.errorhandler(500)
-def internal_server_error(error):
-    return jsonify(
-        {
-            "success": False,
-            "error": "Internal server error."
-        }
-    ), 500
 
 
 # ============================================================
@@ -662,10 +587,14 @@ def internal_server_error(error):
 # ============================================================
 
 if __name__ == "__main__":
-    init_db()
 
     app.run(
         host="127.0.0.1",
-        port=5000,
-        debug=True,
+        port=int(
+            os.getenv(
+                "PORT",
+                "5000"
+            )
+        ),
+        debug=True
     )
