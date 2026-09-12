@@ -5,7 +5,9 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 
-load_dotenv()
+# Only load .env locally if the file exists (prevents clutter/warnings in serverless)
+if os.path-exists(".env"):
+    load_dotenv()
 
 app = Flask(__name__)
 
