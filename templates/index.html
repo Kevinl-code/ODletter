@@ -3,6 +3,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dynamic On-Duty Request Letter Generator</title>
 <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@300;400;500;600;700;800&amp;family=Poppins:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
 <style>
 *{box-sizing:border-box}
@@ -365,6 +366,31 @@ async function downloadPDF(){
         return;
     }
 
+    const btn = event.target;
+    const originalText = btn.textContent;
+    btn.textContent = "Generating Exact PDF...";
+    btn.disabled = true;
+
+    try {
+        const element = document.getElementById("letter_body");
+        const safeEventName = eventName.replace(/[^A-Za-z0-9_-]/g, '_');
+        
+        const options = {
+            margin:       0,
+            filename:     `OD_Letter_${safeEventName}.pdf`,
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2, useCORS: true, letterRendering: true },
+            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+
+        await html2pdf().from(element).set(options).save();
+    } catch(err) {
+        alert("PDF Generation Error: " + err.message);
+    } finally {
+        btn.textContent = originalText;
+        btn.disabled = false;
+    }
+}
     const selectedStudents = Array.from(checkboxes).map(cb => ({
         name: cb.dataset.name,
         register_number: cb.dataset.reg,
