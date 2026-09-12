@@ -87,7 +87,6 @@ def parse_brochure():
         }
         """
 
-        # Pass raw bytes directly using types.Part.from_bytes to avoid disk writes and file API latency
         response = client.models.generate_content(
             model="gemini-2.5-flash",
             contents=[
