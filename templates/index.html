@@ -1,0 +1,613 @@
+<html lang="en"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dynamic On-Duty Request Letter Generator</title>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@300;400;500;600;700;800&amp;family=Poppins:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+
+<style>
+*{box-sizing:border-box}
+:root{--primary:#4f46e5;--primary2:#7c3aed;--success:#10b981;--danger:#ef4444;--text-dark:#1e293b;--muted:#64748b}
+body{margin:0;font-family:"Poppins",sans-serif;background:linear-gradient(135deg,#e0e7ff 0%,#f8fafc 50%,#dbeafe 100%);min-height:100vh;color:var(--text-dark)}
+.app-wrapper{min-height:100vh;display:flex}
+.control-panel{width:40%;max-height:100vh;overflow-y:auto;padding:25px;background:rgba(255,255,255,.8);backdrop-filter:blur(16px);border-right:1px solid rgba(255,255,255,.4);box-shadow:0 8px 32px rgba(31,38,135,.12)}
+.control-panel h2{margin:0 0 20px;font-family:"Figtree",sans-serif;font-size:1.6rem;font-weight:800;color:#0f172a;border-bottom:2px solid rgba(79,70,229,.25);padding-bottom:12px}
+.form-group{margin-bottom:15px}
+.form-group label{display:block;margin-bottom:6px;font-family:"Figtree",sans-serif;font-size:.85rem;font-weight:600;color:#475569}
+input,select{width:100%;padding:10px;border:1px solid rgba(100,116,139,.25);border-radius:8px;background:rgba(255,255,255,.9);outline:none;font-size:13px}
+input:focus,select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(79,70,229,.1)}
+.btn{width:100%;border:0;border-radius:8px;padding:11px;margin-top:6px;color:#fff;font-weight:600;cursor:pointer;transition:.18s ease}
+.btn-upload{background:linear-gradient(135deg,#7c3aed,#4f46e5)}
+.btn-download{background:linear-gradient(135deg,#10b981,#059669)}
+.preview-panel{width:60%;min-height:100vh;padding:30px;overflow:auto}
+.letter-container{width:210mm;min-height:297mm;margin:0 auto;padding:22mm 20mm;background:#fff;color:#111827;font-family:"Times New Roman",serif;font-size:12pt;line-height:1.55;box-shadow:0 10px 40px rgba(15,23,42,.15);position:relative}
+.right{text-align:right}.left{text-align:left}
+.subject{margin-top:20px;margin-bottom:18px;font-weight:bold}
+.content{text-align:justify}
+.signature-table{width:100%;border-collapse:collapse;margin-top:30px}
+.signature-table td{border:0;padding:0}
+.signature-cell{text-align:right;vertical-align:bottom}
+.letter-container>table:not(.signature-table){width:100%;border-collapse:collapse;margin-top:25px}
+.letter-container>table:not(.signature-table) th,.letter-container>table:not(.signature-table) td{border:1px solid #111;padding:6px;text-align:center;font-size:11pt}
+.ai-box{background:rgba(124,58,237,.05);border:1px dashed rgba(124,58,237,.3);padding:12px;border-radius:10px;margin-bottom:20px}
+.student-picker{max-height:150px;overflow-y:auto;border:1px solid rgba(100,116,139,.25);border-radius:8px;padding:8px;background:#fff}
+.student-picker label{display:flex;align-items:center;gap:8px;font-weight:normal;font-size:12px;margin-bottom:4px;cursor:pointer}
+@media screen and (max-width:1024px){.app-wrapper{flex-direction:column}.control-panel,.preview-panel{width:100%}}
+/* Modern Multi-Select Dropdown Styles */
+.dropdown-container { position: relative; width: 100%; }
+.dropdown-select-box { min-height: 42px; border: 1px solid rgba(100,116,139,.25); border-radius: 8px; background: rgba(255,255,255,.9); padding: 6px 10px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; cursor: pointer; transition: all 0.2s ease; }
+.dropdown-select-box:focus-within { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(79,70,229,.1); }
+.dropdown-tag { background: #e0e7ff; color: #4338ca; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
+.dropdown-tag .remove-tag { cursor: pointer; font-weight: bold; font-size: 13px; line-height: 1; }
+.dropdown-tag .remove-tag:hover { color: #dc2626; }
+.dropdown-placeholder { color: var(--muted); font-size: 12px; padding: 4px; user-select: none; }
+.dropdown-menu { position: absolute; top: calc(100% + 4px); left: 0; width: 100%; max-height: 220px; overflow-y: auto; background: #fff; border: 1px solid rgba(100,116,139,.2); border-radius: 8px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); z-index: 100; display: none; padding: 6px; }
+.dropdown-menu.open { display: block; }
+.dropdown-search-input { width: 100%; padding: 8px 10px; border: 1px solid rgba(100,116,139,.2); border-radius: 6px; font-size: 12px; margin-bottom: 6px; outline: none; }
+.dropdown-search-input:focus { border-color: var(--primary); }
+.dropdown-option { display: flex; align-items: center; gap: 8px; padding: 8px 10px; font-size: 12px; border-radius: 6px; cursor: pointer; transition: background 0.15s; }
+.dropdown-option:hover { background: #f1f5f9; }
+.dropdown-option input[type="checkbox"] { width: auto; cursor: pointer; }
+</style>
+<script src="chrome-extension://liecbddmkiiihnedobmlmillhodjkdmb/js/recordConsoleEvents.js"></script></head>
+<body>
+<div class="app-wrapper">
+    <div class="control-panel">
+        <h2>OD Letter Studio</h2>
+
+        <!-- RAG / Agentic Brochure / Invitation Extractor -->
+        <div class="ai-box">
+            <label style="color:#7c3aed;font-weight:700">🤖 AI Brochure / Invitation Extractor</label>
+            <input type="file" id="brochure_file" accept=".pdf,.png,.jpg,.jpeg,.txt" style="margin-top:6px">
+            <button type="button" class="btn btn-upload" onclick="extractBrochureDetails()">Extract &amp; Fill via Gemini</button>
+        </div>
+
+        <div class="form-group">
+            <label>Date</label>
+            <input type="date" id="input_date" oninput="updatePreview()">
+        </div>
+        <div class="form-group">
+            <label>Place</label>
+            <input type="text" id="input_place" value="Trichy" oninput="updatePreview()">
+        </div>
+        <div class="form-group">
+            <label>Requesting Person / Designation</label>
+            <input type="text" id="input_from_name" value="Kevin Lazarus B" oninput="updatePreview()">
+            <input type="text" id="input_from_class" value="Technical Head" style="margin-top:5px" oninput="updatePreview()">
+        </div>
+        <div class="form-group">
+            <label>Department</label>
+            <input type="text" id="input_dept" value="Data Science" oninput="updatePreview()">
+        </div>
+        <div class="form-group">
+            <label>College Name</label>
+            <input type="text" id="input_college" value="Bishop Heber College" oninput="updatePreview()">
+        </div>
+        <div class="form-group">
+            <label>Event Name</label>
+            <input type="text" id="input_event" placeholder="e.g. Hackathon" oninput="updatePreview()">
+        </div>
+        <div class="form-group">
+            <label>Organizing Institution &amp; Place</label>
+            <input type="text" id="input_organizer" placeholder="College Name, City" oninput="updatePreview()">
+        </div>
+        <div class="form-group">
+            <label>From Date &amp; To Date</label>
+            <div style="display:flex;gap:8px">
+                <input type="date" id="input_from_date" oninput="updatePreview()">
+                <input type="date" id="input_to_date" oninput="updatePreview()">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>Select Students from Database Roster</label>
+            <div class="dropdown-container" id="student_dropdown">
+                <div class="dropdown-select-box" onclick="toggleDropdown(event)">
+                    <span class="dropdown-placeholder" id="dropdown_placeholder">Choose students...</span>
+                </div>
+                <div class="dropdown-menu" id="dropdown_menu" onclick="event.stopPropagation()">
+                    <input type="text" class="dropdown-search-input" id="student_search" placeholder="Type to search name or reg no..." oninput="filterDropdownStudents()">
+                    <div id="student_checkbox_container" style="max-height: 160px; overflow-y: auto;">
+                        <!-- Options generated dynamically or kept as structured items -->
+                        <label class="dropdown-option student-item" data-name="abdul rasik s" data-reg="255229101">
+                            <input type="checkbox" value="255229101" data-name="ABDUL RASIK S" data-reg="255229101" onchange="handleStudentSelection()">
+                            <span><b>255229101</b> — ABDUL RASIK S</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="abisheik ruban c" data-reg="255229102">
+                            <input type="checkbox" value="255229102" data-name="ABISHEIK RUBAN C" data-reg="255229102" onchange="handleStudentSelection()">
+                            <span><b>255229102</b> — ABISHEIK RUBAN C</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="abisree m" data-reg="255229103">
+                            <input type="checkbox" value="255229103" data-name="ABISREE M" data-reg="255229103" onchange="handleStudentSelection()">
+                            <span><b>255229103</b> — ABISREE M</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="afreen m" data-reg="255229104">
+                            <input type="checkbox" value="255229104" data-name="AFREEN M" data-reg="255229104" onchange="handleStudentSelection()">
+                            <span><b>255229104</b> — AFREEN M</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="agsce jebal b" data-reg="255229105">
+                            <input type="checkbox" value="255229105" data-name="AGSCE JEBAL B" data-reg="255229105" onchange="handleStudentSelection()">
+                            <span><b>255229105</b> — AGSCE JEBAL B</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="ajay raam e a" data-reg="255229106">
+                            <input type="checkbox" value="255229106" data-name="AJAY RAAM E A" data-reg="255229106" onchange="handleStudentSelection()">
+                            <span><b>255229106</b> — AJAY RAAM E A</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="amala binisha c" data-reg="255229107">
+                            <input type="checkbox" value="255229107" data-name="AMALA BINISHA C" data-reg="255229107" onchange="handleStudentSelection()">
+                            <span><b>255229107</b> — AMALA BINISHA C</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="aravinthan g" data-reg="255229108">
+                            <input type="checkbox" value="255229108" data-name="ARAVINTHAN G" data-reg="255229108" onchange="handleStudentSelection()">
+                            <span><b>255229108</b> — ARAVINTHAN G</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="arumugaperumal s" data-reg="255229109">
+                            <input type="checkbox" value="255229109" data-name="ARUMUGAPERUMAL S" data-reg="255229109" onchange="handleStudentSelection()">
+                            <span><b>255229109</b> — ARUMUGAPERUMAL S</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="balaji g" data-reg="255229110">
+                            <input type="checkbox" value="255229110" data-name="BALAJI G" data-reg="255229110" onchange="handleStudentSelection()">
+                            <span><b>255229110</b> — BALAJI G</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="balamurugan p" data-reg="255229111">
+                            <input type="checkbox" value="255229111" data-name="BALAMURUGAN P" data-reg="255229111" onchange="handleStudentSelection()">
+                            <span><b>255229111</b> — BALAMURUGAN P</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="bhuvaneshwaran d" data-reg="255229112">
+                            <input type="checkbox" value="255229112" data-name="BHUVANESHWARAN D" data-reg="255229112" onchange="handleStudentSelection()">
+                            <span><b>255229112</b> — BHUVANESHWARAN D</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="cyril sylvester d" data-reg="255229113">
+                            <input type="checkbox" value="255229113" data-name="CYRIL SYLVESTER D" data-reg="255229113" onchange="handleStudentSelection()">
+                            <span><b>255229113</b> — CYRIL SYLVESTER D</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="dharani k" data-reg="255229114">
+                            <input type="checkbox" value="255229114" data-name="DHARANI K" data-reg="255229114" onchange="handleStudentSelection()">
+                            <span><b>255229114</b> — DHARANI K</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="divya sri m" data-reg="255229115">
+                            <input type="checkbox" value="255229115" data-name="DIVYA SRI M" data-reg="255229115" onchange="handleStudentSelection()">
+                            <span><b>255229115</b> — DIVYA SRI M</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="diwakaran a" data-reg="255229116">
+                            <input type="checkbox" value="255229116" data-name="DIWAKARAN A" data-reg="255229116" onchange="handleStudentSelection()">
+                            <span><b>255229116</b> — DIWAKARAN A</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="emema v" data-reg="255229117">
+                            <input type="checkbox" value="255229117" data-name="EMEMA V" data-reg="255229117" onchange="handleStudentSelection()">
+                            <span><b>255229117</b> — EMEMA V</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="gauri s" data-reg="255229118">
+                            <input type="checkbox" value="255229118" data-name="GAURI S" data-reg="255229118" onchange="handleStudentSelection()">
+                            <span><b>255229118</b> — GAURI S</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="jagadeshwaran k" data-reg="255229119">
+                            <input type="checkbox" value="255229119" data-name="JAGADESHWARAN K" data-reg="255229119" onchange="handleStudentSelection()">
+                            <span><b>255229119</b> — JAGADESHWARAN K</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="jency g" data-reg="255229120">
+                            <input type="checkbox" value="255229120" data-name="JENCY G" data-reg="255229120" onchange="handleStudentSelection()">
+                            <span><b>255229120</b> — JENCY G</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="jenifer jenitha a" data-reg="255229121">
+                            <input type="checkbox" value="255229121" data-name="JENIFER JENITHA A" data-reg="255229121" onchange="handleStudentSelection()">
+                            <span><b>255229121</b> — JENIFER JENITHA A</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="jerlin g" data-reg="255229122">
+                            <input type="checkbox" value="255229122" data-name="JERLIN G" data-reg="255229122" onchange="handleStudentSelection()">
+                            <span><b>255229122</b> — JERLIN G</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="jhones j" data-reg="255229123">
+                            <input type="checkbox" value="255229123" data-name="JHONES J" data-reg="255229123" onchange="handleStudentSelection()">
+                            <span><b>255229123</b> — JHONES J</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="joel a" data-reg="255229124">
+                            <input type="checkbox" value="255229124" data-name="JOEL A" data-reg="255229124" onchange="handleStudentSelection()">
+                            <span><b>255229124</b> — JOEL A</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="kabil b" data-reg="255229125">
+                            <input type="checkbox" value="255229125" data-name="KABIL B" data-reg="255229125" onchange="handleStudentSelection()">
+                            <span><b>255229125</b> — KABIL B</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="keerthan g" data-reg="255229126">
+                            <input type="checkbox" value="255229126" data-name="KEERTHAN G" data-reg="255229126" onchange="handleStudentSelection()">
+                            <span><b>255229126</b> — KEERTHAN G</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="kevin lazarus b" data-reg="255229127">
+                            <input type="checkbox" value="255229127" data-name="KEVIN LAZARUS B" data-reg="255229127" onchange="handleStudentSelection()">
+                            <span><b>255229127</b> — KEVIN LAZARUS B</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="kiruthika s" data-reg="255229128">
+                            <input type="checkbox" value="255229128" data-name="KIRUTHIKA S" data-reg="255229128" onchange="handleStudentSelection()">
+                            <span><b>255229128</b> — KIRUTHIKA S</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="lakshithal" data-reg="255229129">
+                            <input type="checkbox" value="255229129" data-name="LAKSHITHAL" data-reg="255229129" onchange="handleStudentSelection()">
+                            <span><b>255229129</b> — LAKSHITHAL</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="mahalakshmi s" data-reg="255229130">
+                            <input type="checkbox" value="255229130" data-name="MAHALAKSHMI S" data-reg="255229130" onchange="handleStudentSelection()">
+                            <span><b>255229130</b> — MAHALAKSHMI S</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="manovishnu a v" data-reg="255229131">
+                            <input type="checkbox" value="255229131" data-name="MANOVISHNU A V" data-reg="255229131" onchange="handleStudentSelection()">
+                            <span><b>255229131</b> — MANOVISHNU A V</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="nalan s" data-reg="255229132">
+                            <input type="checkbox" value="255229132" data-name="NALAN S" data-reg="255229132" onchange="handleStudentSelection()">
+                            <span><b>255229132</b> — NALAN S</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="nandhini r" data-reg="255229133">
+                            <input type="checkbox" value="255229133" data-name="NANDHINI R" data-reg="255229133" onchange="handleStudentSelection()">
+                            <span><b>255229133</b> — NANDHINI R</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="naveenkumar c" data-reg="255229134">
+                            <input type="checkbox" value="255229134" data-name="NAVEENKUMAR C" data-reg="255229134" onchange="handleStudentSelection()">
+                            <span><b>255229134</b> — NAVEENKUMAR C</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="nidheesh s" data-reg="255229135">
+                            <input type="checkbox" value="255229135" data-name="NIDHEESH S" data-reg="255229135" onchange="handleStudentSelection()">
+                            <span><b>255229135</b> — NIDHEESH S</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="nirmal g" data-reg="255229136">
+                            <input type="checkbox" value="255229136" data-name="NIRMAL G" data-reg="255229136" onchange="handleStudentSelection()">
+                            <span><b>255229136</b> — NIRMAL G</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="prasanth m" data-reg="255229137">
+                            <input type="checkbox" value="255229137" data-name="PRASANTH M" data-reg="255229137" onchange="handleStudentSelection()">
+                            <span><b>255229137</b> — PRASANTH M</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="pravin v" data-reg="255229138">
+                            <input type="checkbox" value="255229138" data-name="PRAVIN V" data-reg="255229138" onchange="handleStudentSelection()">
+                            <span><b>255229138</b> — PRAVIN V</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="prem selvan r" data-reg="255229139">
+                            <input type="checkbox" value="255229139" data-name="PREM SELVAN R" data-reg="255229139" onchange="handleStudentSelection()">
+                            <span><b>255229139</b> — PREM SELVAN R</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="pricilla c" data-reg="255229140">
+                            <input type="checkbox" value="255229140" data-name="PRICILLA C" data-reg="255229140" onchange="handleStudentSelection()">
+                            <span><b>255229140</b> — PRICILLA C</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="priya tharshini r" data-reg="255229141">
+                            <input type="checkbox" value="255229141" data-name="PRIYA THARSHINI R" data-reg="255229141" onchange="handleStudentSelection()">
+                            <span><b>255229141</b> — PRIYA THARSHINI R</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="raja vignesh p" data-reg="255229142">
+                            <input type="checkbox" value="255229142" data-name="RAJA VIGNESH P" data-reg="255229142" onchange="handleStudentSelection()">
+                            <span><b>255229142</b> — RAJA VIGNESH P</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="rajakumar azariah s" data-reg="255229143">
+                            <input type="checkbox" value="255229143" data-name="RAJAKUMAR AZARIAH S" data-reg="255229143" onchange="handleStudentSelection()">
+                            <span><b>255229143</b> — RAJAKUMAR AZARIAH S</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="rithika m" data-reg="255229144">
+                            <input type="checkbox" value="255229144" data-name="RITHIKA M" data-reg="255229144" onchange="handleStudentSelection()">
+                            <span><b>255229144</b> — RITHIKA M</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="saran b" data-reg="255229145">
+                            <input type="checkbox" value="255229145" data-name="SARAN B" data-reg="255229145" onchange="handleStudentSelection()">
+                            <span><b>255229145</b> — SARAN B</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="sarmila banu a" data-reg="255229146">
+                            <input type="checkbox" value="255229146" data-name="SARMILA BANU A" data-reg="255229146" onchange="handleStudentSelection()">
+                            <span><b>255229146</b> — SARMILA BANU A</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="selvakumar k" data-reg="255229147">
+                            <input type="checkbox" value="255229147" data-name="SELVAKUMAR K" data-reg="255229147" onchange="handleStudentSelection()">
+                            <span><b>255229147</b> — SELVAKUMAR K</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="sivagami a" data-reg="255229148">
+                            <input type="checkbox" value="255229148" data-name="SIVAGAMI A" data-reg="255229148" onchange="handleStudentSelection()">
+                            <span><b>255229148</b> — SIVAGAMI A</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="sivakumar e" data-reg="255229149">
+                            <input type="checkbox" value="255229149" data-name="SIVAKUMAR E" data-reg="255229149" onchange="handleStudentSelection()">
+                            <span><b>255229149</b> — SIVAKUMAR E</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="sriram m" data-reg="255229150">
+                            <input type="checkbox" value="255229150" data-name="SRIRAM M" data-reg="255229150" onchange="handleStudentSelection()">
+                            <span><b>255229150</b> — SRIRAM M</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="stanley wilson m" data-reg="255229151">
+                            <input type="checkbox" value="255229151" data-name="STANLEY WILSON M" data-reg="255229151" onchange="handleStudentSelection()">
+                            <span><b>255229151</b> — STANLEY WILSON M</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="susmitha m" data-reg="255229152">
+                            <input type="checkbox" value="255229152" data-name="SUSMITHA M" data-reg="255229152" onchange="handleStudentSelection()">
+                            <span><b>255229152</b> — SUSMITHA M</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="swathi s" data-reg="255229153">
+                            <input type="checkbox" value="255229153" data-name="SWATHI S" data-reg="255229153" onchange="handleStudentSelection()">
+                            <span><b>255229153</b> — SWATHI S</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="thanusiya r" data-reg="255229154">
+                            <input type="checkbox" value="255229154" data-name="THANUSIYA R" data-reg="255229154" onchange="handleStudentSelection()">
+                            <span><b>255229154</b> — THANUSIYA R</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="thirumalai rajan s" data-reg="255229155">
+                            <input type="checkbox" value="255229155" data-name="THIRUMALAI RAJAN S" data-reg="255229155" onchange="handleStudentSelection()">
+                            <span><b>255229155</b> — THIRUMALAI RAJAN S</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="thirupugazh m" data-reg="255229156">
+                            <input type="checkbox" value="255229156" data-name="THIRUPUGAZH M" data-reg="255229156" onchange="handleStudentSelection()">
+                            <span><b>255229156</b> — THIRUPUGAZH M</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="vijay v s" data-reg="255229157">
+                            <input type="checkbox" value="255229157" data-name="VIJAY V S" data-reg="255229157" onchange="handleStudentSelection()">
+                            <span><b>255229157</b> — VIJAY V S</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="yogalakshmi k" data-reg="255229158">
+                            <input type="checkbox" value="255229158" data-name="YOGALAKSHMI K" data-reg="255229158" onchange="handleStudentSelection()">
+                            <span><b>255229158</b> — YOGALAKSHMI K</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="jaya varshini i" data-reg="255229159">
+                            <input type="checkbox" value="255229159" data-name="JAYA VARSHINI I" data-reg="255229159" onchange="handleStudentSelection()">
+                            <span><b>255229159</b> — JAYA VARSHINI I</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="keerthana sirja s" data-reg="255229161">
+                            <input type="checkbox" value="255229161" data-name="KEERTHANA SIRJA S" data-reg="255229161" onchange="handleStudentSelection()">
+                            <span><b>255229161</b> — KEERTHANA SIRJA S</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="sharan kumar" data-reg="255229162">
+                            <input type="checkbox" value="255229162" data-name="SHARAN KUMAR" data-reg="255229162" onchange="handleStudentSelection()">
+                            <span><b>255229162</b> — SHARAN KUMAR</span>
+                        </label>
+                        <label class="dropdown-option student-item" data-name="lokesh" data-reg="255229163">
+                            <input type="checkbox" value="255229163" data-name="LOKESH" data-reg="255229163" onchange="handleStudentSelection()">
+                            <span><b>255229163</b> — LOKESH</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>        
+        
+
+        <button class="btn btn-download" onclick="downloadPDF()">Download Letter PDF</button>
+    </div>
+
+    <div class="preview-panel">
+        <div id="letter_body" class="letter-container">
+            <div class="right">
+                <span id="view_place">Trichy</span><br>
+                <span id="view_date">11/09/2026</span>
+            </div>
+            <br>
+            <div class="left">
+                <b>From</b><br>
+                <span id="view_from_name">Kevin Lazarus B</span><br>
+                <span id="view_from_designation">Technical Head</span><br>
+                Department of <span id="view_dept_from">Data Science</span><br>
+                <span id="view_college_from">Bishop Heber College</span>
+            </div>
+            <br>
+            <div class="left">
+                <b>To</b><br>
+                The Head of the Department<br>
+                Department of <span id="view_dept_to">Data Science</span><br>
+                <span id="view_college_to">Bishop Heber College</span>
+            </div>
+            <div class="subject">
+                Subject: Request for Grant of On-Duty Permission for Students Participating in <span id="view_event_subj">________</span>
+            </div>
+            <p>Respected Sir/Mam,</p>
+            <p class="content">
+                I respectfully submit that the following students of the Department of <span id="view_dept_body">Data Science</span> have registered to participate in <b id="view_event_body">________</b> organized by <b id="view_organizer_body">________</b> <span id="view_date_sentence"> on <b>11/09/2026</b>.</span>
+            </p>
+            <p class="content">
+                The event is of academic significance and will provide valuable exposure. Therefore, I kindly request you to grant On-Duty (OD) permission for the selected participants.
+            </p>
+            <center><p>Thank You</p></center>
+            <table class="signature-table">
+                <tbody><tr>
+                    <td class="signature-cell">
+                        <p style="margin-bottom:0">Yours faithfully,</p>
+                        <strong style="margin-top:40px"><span id="view_from_name_close">Kevin Lazarus B</span></strong>
+                        
+ <br> <span id="view_from_designation_close">Technical Head</span>
+                    </td>
+                </tr>
+            </tbody></table>
+            <table>
+                <thead>
+                    <tr>
+                        <th>S.No</th>
+                        <th>Student Name</th>
+                        <th>Register Number</th>
+                        <th>Year</th>
+                        <th>Section</th>
+                    </tr>
+                </thead>
+                <tbody id="view_student_rows"><tr><td colspan="5" style="color:#888">No students selected</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+function formatDateString(val){
+    if(!val) return "________";
+    const d = new Date(val + "T00:00:00");
+    return d.toLocaleDateString("en-GB",{day:"2-digit",month:"2-digit",year:"numeric"});
+}
+
+function updatePreview(){
+    document.getElementById("view_date").innerText = formatDateString(document.getElementById("input_date").value);
+    document.getElementById("view_place").innerText = document.getElementById("input_place").value || "Trichy";
+    
+    const name = document.getElementById("input_from_name").value;
+    const des = document.getElementById("input_from_class").value;
+    document.getElementById("view_from_name").innerText = name;
+    document.getElementById("view_from_name_close").innerText = name;
+    document.getElementById("view_from_designation").innerText = des;
+    document.getElementById("view_from_designation_close").innerText = des;
+
+    const dept = document.getElementById("input_dept").value;
+    document.getElementById("view_dept_from").innerText = dept;
+    document.getElementById("view_dept_to").innerText = dept;
+    document.getElementById("view_dept_body").innerText = dept;
+
+    const college = document.getElementById("input_college").value;
+    document.getElementById("view_college_from").innerText = college;
+    document.getElementById("view_college_to").innerText = college;
+
+    const eventName = document.getElementById("input_event").value || "________";
+    document.getElementById("view_event_subj").innerText = eventName;
+    document.getElementById("view_event_body").innerText = eventName;
+
+    const organizer = document.getElementById("input_organizer").value || "________";
+    document.getElementById("view_organizer_body").innerText = organizer;
+
+    const fromDate = document.getElementById("input_from_date").value;
+    const toDate = document.getElementById("input_to_date").value;
+    let dateStr = ".";
+    if(fromDate && toDate && fromDate === toDate){
+        dateStr = ` on <b>${formatDateString(fromDate)}</b>.`;
+    }else if(fromDate && toDate){
+        dateStr = ` from <b>${formatDateString(fromDate)}</b> to <b>${formatDateString(toDate)}</b>.`;
+    }
+    document.getElementById("view_date_sentence").innerHTML = dateStr;
+
+    // Build student rows from selected checkboxes
+    const checkboxes = document.querySelectorAll('.student-picker input[type="checkbox"]:checked');
+    const tbody = document.getElementById("view_student_rows");
+    tbody.innerHTML = "";
+
+    if(checkboxes.length === 0){
+        tbody.innerHTML = `<tr><td colspan="5" style="color:#888">No students selected</td></tr>`;
+        return;
+    }
+
+    checkboxes.forEach((cb, idx) => {
+        const row = document.createElement("tr");
+        [idx + 1, cb.dataset.name, cb.dataset.reg, "II", "A"].forEach(val => {
+            const td = document.createElement("td");
+            td.textContent = val;
+            row.appendChild(td);
+        });
+        tbody.appendChild(row);
+    });
+}
+
+// Toggle dropdown visibility
+function toggleDropdown(event) {
+    const menu = document.getElementById("dropdown_menu");
+    menu.classList.toggle("open");
+    if (menu.classList.contains("open")) {
+        document.getElementById("student_search").focus();
+    }
+}
+
+// Close dropdown when clicking outside
+window.addEventListener("click", function(e) {
+    const container = document.getElementById("student_dropdown");
+    if (!container.contains(e.target)) {
+        document.getElementById("dropdown_menu").classList.remove("open");
+    }
+});
+
+// Handle selections, render interactive tags inside the select box, and update preview
+function handleStudentSelection() {
+    renderDropdownTags();
+    updatePreview();
+}
+
+function renderDropdownTags() {
+    const selectBox = document.querySelector(".dropdown-select-box");
+    const checkboxes = document.querySelectorAll('.student-picker input[type="checkbox"]:checked, #student_checkbox_container input[type="checkbox"]:checked');
+    
+    // Clear current contents except placeholder/tags
+    selectBox.innerHTML = "";
+
+    if (checkboxes.length === 0) {
+        const placeholder = document.createElement("span");
+        placeholder.className = "dropdown-placeholder";
+        placeholder.id = "dropdown_placeholder";
+        placeholder.textContent = "Choose students...";
+        selectBox.appendChild(placeholder);
+        return;
+    }
+
+    checkboxes.forEach(cb => {
+        const tag = document.createElement("div");
+        tag.className = "dropdown-tag";
+        tag.innerHTML = `${cb.dataset.reg} — ${cb.dataset.name} <span class="remove-tag" onclick="removeStudent(event, '${cb.value}')">&times;</span>`;
+        selectBox.appendChild(tag);
+    });
+}
+
+function removeStudent(event, regVal) {
+    event.stopPropagation();
+    const checkbox = document.querySelector(`#student_checkbox_container input[value="${regVal}"]`);
+    if (checkbox) {
+        checkbox.checked = false;
+        handleStudentSelection();
+    }
+}
+
+function filterDropdownStudents() {
+    const query = document.getElementById("student_search").value.toLowerCase();
+    document.querySelectorAll('#student_checkbox_container .student-item').forEach(item => {
+        const name = item.dataset.name;
+        const reg = item.dataset.reg;
+        if(name.includes(query) || reg.includes(query)){
+            item.style.display = "flex";
+        }else{
+            item.style.display = "none";
+        }
+    });
+}
+async function extractBrochureDetails(){
+    const fileInput = document.getElementById("brochure_file");
+    if(fileInput.files.length === 0){
+        alert("Please select a brochure or invitation file first.");
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", fileInput.files[0]);
+
+    const btn = event.target;
+    btn.textContent = "Extracting with Gemini AI...";
+    btn.disabled = true;
+
+    try {
+        const res = await fetch("/api/parse-brochure", { method: "POST", body: formData });
+        const data = await res.json();
+        
+        if(data.event_name) document.getElementById("input_event").value = data.event_name;
+        if(data.organizer) document.getElementById("input_organizer").value = data.organizer;
+        if(data.from_date) document.getElementById("input_from_date").value = data.from_date;
+        if(data.to_date) document.getElementById("input_to_date").value = data.to_date;
+        if(data.place) document.getElementById("input_place").value = data.place;
+
+        updatePreview();
+        alert("Event details successfully extracted and populated!");
+    } catch(err) {
+        alert("Failed to extract details: " + err.message);
+    } finally {
+        btn.textContent = "Extract & Fill via Gemini";
+        btn.disabled = false;
+    }
+}
+
+async function downloadPDF(){
+    const original = document.getElementById("letter_body");
+    const canvas = await html2canvas(original, { scale: 2, useCORS: true });
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
+    pdf.addImage(canvas.toDataURL("image/jpeg", 0.98), "JPEG", 0, 0, 210, 297);
+    pdf.save("On-Duty-Request-Letter.pdf");
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    const today = new Date().toISOString().slice(0,10);
+    document.getElementById("input_date").value = today;
+    document.getElementById("input_from_date").value = today;
+    document.getElementById("input_to_date").value = today;
+    updatePreview();
+});
+</script>
+
+</body><chatgpt-sidebar data-rendered="true" data-gpts-theme="light"></chatgpt-sidebar></html>

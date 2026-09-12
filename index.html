@@ -1,796 +1,599 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
+<html lang="en"><head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>On-Duty Request Letter Generator</title>
-
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@300;400;500;600;700;800&family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<!-- PDF libraries: jsDelivr is used instead of the previous cdnjs dependency. -->
+<title>Dynamic On-Duty Request Letter Generator</title>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@300;400;500;600;700;800&amp;family=Poppins:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 
 <style>
 *{box-sizing:border-box}
-:root{
-    --primary:#4f46e5;
-    --primary2:#7c3aed;
-    --success:#10b981;
-    --danger:#ef4444;
-    --text-dark:#1e293b;
-    --muted:#64748b;
-}
-body{
-    margin:0;
-    font-family:"Poppins",sans-serif;
-    background:linear-gradient(135deg,#e0e7ff 0%,#f8fafc 50%,#dbeafe 100%);
-    min-height:100vh;
-    color:var(--text-dark);
-}
+:root{--primary:#4f46e5;--primary2:#7c3aed;--success:#10b981;--danger:#ef4444;--text-dark:#1e293b;--muted:#64748b}
+body{margin:0;font-family:"Poppins",sans-serif;background:linear-gradient(135deg,#e0e7ff 0%,#f8fafc 50%,#dbeafe 100%);min-height:100vh;color:var(--text-dark)}
 .app-wrapper{min-height:100vh;display:flex}
-.control-panel{
-    width:35%;
-    max-height:100vh;
-    overflow-y:auto;
-    padding:30px;
-    background:rgba(255,255,255,.65);
-    backdrop-filter:blur(16px);
-    -webkit-backdrop-filter:blur(16px);
-    border-right:1px solid rgba(255,255,255,.4);
-    box-shadow:0 8px 32px rgba(31,38,135,.12);
-}
-.control-panel h2{
-    margin:0 0 25px;
-    font-family:"Figtree",sans-serif;
-    font-size:1.8rem;
-    font-weight:800;
-    color:#0f172a;
-    border-bottom:2px solid rgba(79,70,229,.25);
-    padding-bottom:15px;
-}
-.control-panel h3{margin-top:25px;color:#334155}
-.form-group{margin-bottom:18px}
-.form-group label{
-    display:block;
-    margin-bottom:7px;
-    font-family:"Figtree",sans-serif;
-    font-size:.9rem;
-    font-weight:600;
-    color:#475569;
-}
-input,select{
-    width:100%;
-    padding:11px 12px;
-    border:1px solid rgba(100,116,139,.25);
-    border-radius:10px;
-    background:rgba(255,255,255,.8);
-    outline:none;
-    font-family:"Poppins",sans-serif;
-    font-size:14px;
-}
-input:focus,select:focus{
-    border-color:var(--primary);
-    box-shadow:0 0 0 3px rgba(79,70,229,.1);
-}
-.student-entry{
-    margin-bottom:12px;
-    padding:12px;
-    border-radius:12px;
-    background:rgba(255,255,255,.55);
-    border:1px solid rgba(100,116,139,.15);
-}
-.btn{
-    width:100%;
-    border:0;
-    border-radius:10px;
-    padding:12px 16px;
-    margin-top:8px;
-    color:#fff;
-    font-family:"Poppins",sans-serif;
-    font-weight:600;
-    cursor:pointer;
-    transition:.18s ease;
-}
-.btn:hover{transform:translateY(-1px);box-shadow:0 8px 20px rgba(79,70,229,.18)}
-.btn:disabled{opacity:.6;cursor:not-allowed;transform:none}
-.btn-add-student{background:linear-gradient(135deg,#6366f1,#4f46e5)}
+.control-panel{width:40%;max-height:100vh;overflow-y:auto;padding:25px;background:rgba(255,255,255,.8);backdrop-filter:blur(16px);border-right:1px solid rgba(255,255,255,.4);box-shadow:0 8px 32px rgba(31,38,135,.12)}
+.control-panel h2{margin:0 0 20px;font-family:"Figtree",sans-serif;font-size:1.6rem;font-weight:800;color:#0f172a;border-bottom:2px solid rgba(79,70,229,.25);padding-bottom:12px}
+.form-group{margin-bottom:15px}
+.form-group label{display:block;margin-bottom:6px;font-family:"Figtree",sans-serif;font-size:.85rem;font-weight:600;color:#475569}
+input,select{width:100%;padding:10px;border:1px solid rgba(100,116,139,.25);border-radius:8px;background:rgba(255,255,255,.9);outline:none;font-size:13px}
+input:focus,select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(79,70,229,.1)}
+.btn{width:100%;border:0;border-radius:8px;padding:11px;margin-top:6px;color:#fff;font-weight:600;cursor:pointer;transition:.18s ease}
+.btn-upload{background:linear-gradient(135deg,#7c3aed,#4f46e5)}
 .btn-download{background:linear-gradient(135deg,#10b981,#059669)}
-.preview-panel{
-    width:65%;
-    min-height:100vh;
-    padding:40px;
-    overflow:auto;
-}
-.info-banner{
-    max-width:600px;
-    margin:0 auto 20px;
-    padding:15px 18px;
-    background:rgba(255,255,255,.7);
-    border:1px solid rgba(79,70,229,.12);
-    color:#475569;
-    border-radius:14px;
-    box-shadow:0 10px 30px rgba(15,23,42,.08);
-    font-size:13px;
-}
-.info-banner strong{color:#312e81}
-.conditional-fields{
-    margin-top:10px;
-    padding:12px;
-    border-radius:12px;
-    background:rgba(99,102,241,.06);
-    border:1px solid rgba(99,102,241,.12);
-}
-.hidden{display:none!important}
-.letter-container{
-    width:210mm;
-    min-height:297mm;
-    margin:0 auto;
-    padding:22mm 20mm;
-    background:#fff;
-    color:#111827;
-    font-family:"Times New Roman",serif;
-    font-size:12pt;
-    line-height:1.55;
-    box-shadow:0 10px 40px rgba(15,23,42,.15);
-    position:relative;
-}
+.preview-panel{width:60%;min-height:100vh;padding:30px;overflow:auto}
+.letter-container{width:210mm;min-height:297mm;margin:0 auto;padding:22mm 20mm;background:#fff;color:#111827;font-family:"Times New Roman",serif;font-size:12pt;line-height:1.55;box-shadow:0 10px 40px rgba(15,23,42,.15);position:relative}
 .right{text-align:right}.left{text-align:left}
-.subject{margin-top:24px;margin-bottom:22px;font-weight:bold}
+.subject{margin-top:20px;margin-bottom:18px;font-weight:bold}
 .content{text-align:justify}
-.signature-table{width:100%;border-collapse:collapse;margin-top:40px}
+.signature-table{width:100%;border-collapse:collapse;margin-top:30px}
 .signature-table td{border:0;padding:0}
 .signature-cell{text-align:right;vertical-align:bottom}
-.signature-cell strong{display:block;margin-top:50px}
-.letter-container>table:not(.signature-table){
-    width:100%;border-collapse:collapse;margin-top:30px
-}
-.letter-container>table:not(.signature-table) th,
-.letter-container>table:not(.signature-table) td{
-    border:1px solid #111;padding:7px;text-align:center;font-size:11pt
-}
-.letter-container>table:not(.signature-table) th{font-weight:bold}
-
-/* PDF-only rendering */
-.pdf-render{
-    width:210mm!important;
-    min-height:297mm!important;
-    margin:0!important;
-    padding:22mm 20mm!important;
-    background:#fff!important;
-    box-shadow:none!important;
-    filter:none!important;
-    backdrop-filter:none!important;
-    -webkit-backdrop-filter:none!important;
-    overflow:visible!important;
-    color:#111827!important;
-    font-family:"Times New Roman",serif!important;
-    position:absolute!important;
-    left:0!important;
-    top:0!important;
-}
-.pdf-render *{visibility:visible!important}
-
-/* Premium modal */
-.modal-backdrop{
-    position:fixed;
-    inset:0;
-    z-index:9999;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    padding:20px;
-    background:rgba(15,23,42,.58);
-    backdrop-filter:blur(10px);
-    -webkit-backdrop-filter:blur(10px);
-    opacity:0;
-    visibility:hidden;
-    transition:.22s ease;
-}
-.modal-backdrop.show{opacity:1;visibility:visible}
-.modal-card{
-    width:min(440px,100%);
-    background:linear-gradient(145deg,rgba(255,255,255,.98),rgba(248,250,252,.98));
-    border:1px solid rgba(255,255,255,.8);
-    border-radius:24px;
-    padding:28px;
-    box-shadow:0 30px 90px rgba(15,23,42,.35);
-    transform:translateY(15px) scale(.97);
-    transition:.25s ease;
-}
-.modal-backdrop.show .modal-card{transform:translateY(0) scale(1)}
-.modal-icon{
-    width:58px;height:58px;border-radius:18px;
-    display:grid;place-items:center;
-    font-size:25px;margin-bottom:18px;
-}
-.modal-icon.success{background:rgba(16,185,129,.12);color:#059669}
-.modal-icon.error{background:rgba(239,68,68,.12);color:#dc2626}
-.modal-card h3{margin:0 0 8px;font-size:21px;color:#0f172a}
-.modal-card p{margin:0;color:#64748b;line-height:1.6;font-size:14px}
-.modal-actions{display:flex;gap:10px;margin-top:22px}
-.modal-actions button{
-    flex:1;border:0;border-radius:12px;padding:12px 14px;
-    font-family:"Poppins",sans-serif;font-weight:700;cursor:pointer;
-}
-.modal-primary{background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff}
-.modal-secondary{background:#eef2ff;color:#3730a3}
-.modal-close{background:#f1f5f9;color:#475569}
-.modal-actions button:hover{transform:translateY(-1px)}
-.modal-hint{margin-top:12px!important;font-size:12px!important;color:#94a3b8!important}
-
-@media screen and (max-width:1024px){
-    .app-wrapper{flex-direction:column}
-    .control-panel,.preview-panel{width:100%}
-    .control-panel{max-height:none}
-    .preview-panel{padding:20px}
-    .letter-container{width:100%;min-height:auto}
-}
-@media(max-width:560px){
-    .control-panel{padding:20px}
-    .preview-panel{padding:12px}
-    .letter-container{padding:18mm 12mm;font-size:11pt}
-    .modal-card{padding:22px;border-radius:20px}
-    .modal-actions{flex-direction:column}
-}
-@media print{
-    .control-panel,.info-banner,.no-print{display:none!important}
-    body{background:#fff!important}
-    .app-wrapper{display:block}
-    .preview-panel{width:100%;padding:0}
-    .letter-container{
-        width:210mm;min-height:297mm;margin:0;box-shadow:none
-    }
-}
+.letter-container>table:not(.signature-table){width:100%;border-collapse:collapse;margin-top:25px}
+.letter-container>table:not(.signature-table) th,.letter-container>table:not(.signature-table) td{border:1px solid #111;padding:6px;text-align:center;font-size:11pt}
+.ai-box{background:rgba(124,58,237,.05);border:1px dashed rgba(124,58,237,.3);padding:12px;border-radius:10px;margin-bottom:20px}
+.student-picker{max-height:150px;overflow-y:auto;border:1px solid rgba(100,116,139,.25);border-radius:8px;padding:8px;background:#fff}
+.student-picker label{display:flex;align-items:center;gap:8px;font-weight:normal;font-size:12px;margin-bottom:4px;cursor:pointer}
+@media screen and (max-width:1024px){.app-wrapper{flex-direction:column}.control-panel,.preview-panel{width:100%}}
 </style>
-</head>
-
+<script src="chrome-extension://liecbddmkiiihnedobmlmillhodjkdmb/js/recordConsoleEvents.js"></script></head>
 <body>
 <div class="app-wrapper">
+    <div class="control-panel">
+        <h2>OD Letter Studio</h2>
 
-<div class="control-panel no-print">
-    <h2>Letterpad</h2>
+        <!-- RAG / Agentic Brochure / Invitation Extractor -->
+        <div class="ai-box">
+            <label style="color:#7c3aed;font-weight:700">🤖 AI Brochure / Invitation Extractor</label>
+            <input type="file" id="brochure_file" accept=".pdf,.png,.jpg,.jpeg,.txt" style="margin-top:6px">
+            <button type="button" class="btn btn-upload" onclick="extractBrochureDetails()">Extract &amp; Fill via Gemini</button>
+        </div>
 
-    <div class="form-group">
-        <label>Date</label>
-        <input type="date" id="input_date" oninput="updatePreview()">
-    </div>
-    <div class="form-group">
-        <label>Place</label>
-        <input type="text" id="input_place" value="Trichy" oninput="updatePreview()">
-    </div>
-
-    <div class="form-group">
-        <label>From — Person Requesting OD</label>
-        <select id="input_from_person" onchange="handleFromPersonChange()">
-            <option value="kevin" selected>Kevin Lazarus B — Technical Head</option>
-            <option value="other">Other — Edit details</option>
-        </select>
-    </div>
-
-    <div id="other_from_fields" class="conditional-fields hidden">
         <div class="form-group">
-            <label>Name</label>
-            <input type="text" id="input_from_name" placeholder="Enter name" oninput="updatePreview()">
+            <label>Date</label>
+            <input type="date" id="input_date" oninput="updatePreview()">
         </div>
         <div class="form-group">
-            <label>Designation / Class</label>
-            <input type="text" id="input_from_class" placeholder="e.g. II M.Sc. Data Science / Class Representative" oninput="updatePreview()">
+            <label>Place</label>
+            <input type="text" id="input_place" value="Trichy" oninput="updatePreview()">
         </div>
+        <div class="form-group">
+            <label>Requesting Person / Designation</label>
+            <input type="text" id="input_from_name" value="Kevin Lazarus B" oninput="updatePreview()">
+            <input type="text" id="input_from_class" value="Technical Head" style="margin-top:5px" oninput="updatePreview()">
+        </div>
+        <div class="form-group">
+            <label>Department</label>
+            <input type="text" id="input_dept" value="Data Science" oninput="updatePreview()">
+        </div>
+        <div class="form-group">
+            <label>College Name</label>
+            <input type="text" id="input_college" value="Bishop Heber College" oninput="updatePreview()">
+        </div>
+        <div class="form-group">
+            <label>Event Name</label>
+            <input type="text" id="input_event" placeholder="e.g. Hackathon" oninput="updatePreview()">
+        </div>
+        <div class="form-group">
+            <label>Organizing Institution &amp; Place</label>
+            <input type="text" id="input_organizer" placeholder="College Name, City" oninput="updatePreview()">
+        </div>
+        <div class="form-group">
+            <label>From Date &amp; To Date</label>
+            <div style="display:flex;gap:8px">
+                <input type="date" id="input_from_date" oninput="updatePreview()">
+                <input type="date" id="input_to_date" oninput="updatePreview()">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>Select Students from Database Roster</label>
+            <div style="margin-bottom:6px">
+                <input type="text" id="student_search" placeholder="Search by name or reg no..." oninput="filterStudents()" style="padding:6px;font-size:12px">
+            </div>
+            <div class="student-picker" id="student_checkbox_container">
+                
+                <label class="student-item" data-name="abdul rasik s" data-reg="255229101">
+                    <input type="checkbox" value="255229101" data-name="ABDUL RASIK S" data-reg="255229101" onchange="updatePreview()">
+                    255229101 — ABDUL RASIK S
+                </label>
+                
+                <label class="student-item" data-name="abisheik ruban c" data-reg="255229102">
+                    <input type="checkbox" value="255229102" data-name="ABISHEIK RUBAN C" data-reg="255229102" onchange="updatePreview()">
+                    255229102 — ABISHEIK RUBAN C
+                </label>
+                
+                <label class="student-item" data-name="abisree m" data-reg="255229103">
+                    <input type="checkbox" value="255229103" data-name="ABISREE M" data-reg="255229103" onchange="updatePreview()">
+                    255229103 — ABISREE M
+                </label>
+                
+                <label class="student-item" data-name="afreen m" data-reg="255229104">
+                    <input type="checkbox" value="255229104" data-name="AFREEN M" data-reg="255229104" onchange="updatePreview()">
+                    255229104 — AFREEN M
+                </label>
+                
+                <label class="student-item" data-name="agsce jebal b" data-reg="255229105">
+                    <input type="checkbox" value="255229105" data-name="AGSCE JEBAL B" data-reg="255229105" onchange="updatePreview()">
+                    255229105 — AGSCE JEBAL B
+                </label>
+                
+                <label class="student-item" data-name="ajay raam e a" data-reg="255229106">
+                    <input type="checkbox" value="255229106" data-name="AJAY RAAM E A" data-reg="255229106" onchange="updatePreview()">
+                    255229106 — AJAY RAAM E A
+                </label>
+                
+                <label class="student-item" data-name="amala binisha c" data-reg="255229107">
+                    <input type="checkbox" value="255229107" data-name="AMALA BINISHA C" data-reg="255229107" onchange="updatePreview()">
+                    255229107 — AMALA BINISHA C
+                </label>
+                
+                <label class="student-item" data-name="aravinthan g" data-reg="255229108">
+                    <input type="checkbox" value="255229108" data-name="ARAVINTHAN G" data-reg="255229108" onchange="updatePreview()">
+                    255229108 — ARAVINTHAN G
+                </label>
+                
+                <label class="student-item" data-name="arumugaperumal s" data-reg="255229109">
+                    <input type="checkbox" value="255229109" data-name="ARUMUGAPERUMAL S" data-reg="255229109" onchange="updatePreview()">
+                    255229109 — ARUMUGAPERUMAL S
+                </label>
+                
+                <label class="student-item" data-name="balaji g" data-reg="255229110">
+                    <input type="checkbox" value="255229110" data-name="BALAJI G" data-reg="255229110" onchange="updatePreview()">
+                    255229110 — BALAJI G
+                </label>
+                
+                <label class="student-item" data-name="balamurugan p" data-reg="255229111">
+                    <input type="checkbox" value="255229111" data-name="BALAMURUGAN P" data-reg="255229111" onchange="updatePreview()">
+                    255229111 — BALAMURUGAN P
+                </label>
+                
+                <label class="student-item" data-name="bhuvaneshwaran d" data-reg="255229112">
+                    <input type="checkbox" value="255229112" data-name="BHUVANESHWARAN D" data-reg="255229112" onchange="updatePreview()">
+                    255229112 — BHUVANESHWARAN D
+                </label>
+                
+                <label class="student-item" data-name="cyril sylvester d" data-reg="255229113">
+                    <input type="checkbox" value="255229113" data-name="CYRIL SYLVESTER D" data-reg="255229113" onchange="updatePreview()">
+                    255229113 — CYRIL SYLVESTER D
+                </label>
+                
+                <label class="student-item" data-name="dharani k" data-reg="255229114">
+                    <input type="checkbox" value="255229114" data-name="DHARANI K" data-reg="255229114" onchange="updatePreview()">
+                    255229114 — DHARANI K
+                </label>
+                
+                <label class="student-item" data-name="divya sri m" data-reg="255229115">
+                    <input type="checkbox" value="255229115" data-name="DIVYA SRI M" data-reg="255229115" onchange="updatePreview()">
+                    255229115 — DIVYA SRI M
+                </label>
+                
+                <label class="student-item" data-name="diwakaran a" data-reg="255229116">
+                    <input type="checkbox" value="255229116" data-name="DIWAKARAN A" data-reg="255229116" onchange="updatePreview()">
+                    255229116 — DIWAKARAN A
+                </label>
+                
+                <label class="student-item" data-name="emema v" data-reg="255229117">
+                    <input type="checkbox" value="255229117" data-name="EMEMA V" data-reg="255229117" onchange="updatePreview()">
+                    255229117 — EMEMA V
+                </label>
+                
+                <label class="student-item" data-name="gauri s" data-reg="255229118">
+                    <input type="checkbox" value="255229118" data-name="GAURI S" data-reg="255229118" onchange="updatePreview()">
+                    255229118 — GAURI S
+                </label>
+                
+                <label class="student-item" data-name="jagadeshwaran k" data-reg="255229119">
+                    <input type="checkbox" value="255229119" data-name="JAGADESHWARAN K" data-reg="255229119" onchange="updatePreview()">
+                    255229119 — JAGADESHWARAN K
+                </label>
+                
+                <label class="student-item" data-name="jency g" data-reg="255229120">
+                    <input type="checkbox" value="255229120" data-name="JENCY G" data-reg="255229120" onchange="updatePreview()">
+                    255229120 — JENCY G
+                </label>
+                
+                <label class="student-item" data-name="jenifer jenitha a" data-reg="255229121">
+                    <input type="checkbox" value="255229121" data-name="JENIFER JENITHA A" data-reg="255229121" onchange="updatePreview()">
+                    255229121 — JENIFER JENITHA A
+                </label>
+                
+                <label class="student-item" data-name="jerlin g" data-reg="255229122">
+                    <input type="checkbox" value="255229122" data-name="JERLIN G" data-reg="255229122" onchange="updatePreview()">
+                    255229122 — JERLIN G
+                </label>
+                
+                <label class="student-item" data-name="jhones j" data-reg="255229123">
+                    <input type="checkbox" value="255229123" data-name="JHONES J" data-reg="255229123" onchange="updatePreview()">
+                    255229123 — JHONES J
+                </label>
+                
+                <label class="student-item" data-name="joel a" data-reg="255229124">
+                    <input type="checkbox" value="255229124" data-name="JOEL A" data-reg="255229124" onchange="updatePreview()">
+                    255229124 — JOEL A
+                </label>
+                
+                <label class="student-item" data-name="kabil b" data-reg="255229125">
+                    <input type="checkbox" value="255229125" data-name="KABIL B" data-reg="255229125" onchange="updatePreview()">
+                    255229125 — KABIL B
+                </label>
+                
+                <label class="student-item" data-name="keerthan g" data-reg="255229126">
+                    <input type="checkbox" value="255229126" data-name="KEERTHAN G" data-reg="255229126" onchange="updatePreview()">
+                    255229126 — KEERTHAN G
+                </label>
+                
+                <label class="student-item" data-name="kevin lazarus b" data-reg="255229127">
+                    <input type="checkbox" value="255229127" data-name="KEVIN LAZARUS B" data-reg="255229127" onchange="updatePreview()">
+                    255229127 — KEVIN LAZARUS B
+                </label>
+                
+                <label class="student-item" data-name="kiruthika s" data-reg="255229128">
+                    <input type="checkbox" value="255229128" data-name="KIRUTHIKA S" data-reg="255229128" onchange="updatePreview()">
+                    255229128 — KIRUTHIKA S
+                </label>
+                
+                <label class="student-item" data-name="lakshithal" data-reg="255229129">
+                    <input type="checkbox" value="255229129" data-name="LAKSHITHAL" data-reg="255229129" onchange="updatePreview()">
+                    255229129 — LAKSHITHAL
+                </label>
+                
+                <label class="student-item" data-name="mahalakshmi s" data-reg="255229130">
+                    <input type="checkbox" value="255229130" data-name="MAHALAKSHMI S" data-reg="255229130" onchange="updatePreview()">
+                    255229130 — MAHALAKSHMI S
+                </label>
+                
+                <label class="student-item" data-name="manovishnu a v" data-reg="255229131">
+                    <input type="checkbox" value="255229131" data-name="MANOVISHNU A V" data-reg="255229131" onchange="updatePreview()">
+                    255229131 — MANOVISHNU A V
+                </label>
+                
+                <label class="student-item" data-name="nalan s" data-reg="255229132">
+                    <input type="checkbox" value="255229132" data-name="NALAN S" data-reg="255229132" onchange="updatePreview()">
+                    255229132 — NALAN S
+                </label>
+                
+                <label class="student-item" data-name="nandhini r" data-reg="255229133">
+                    <input type="checkbox" value="255229133" data-name="NANDHINI R" data-reg="255229133" onchange="updatePreview()">
+                    255229133 — NANDHINI R
+                </label>
+                
+                <label class="student-item" data-name="naveenkumar c" data-reg="255229134">
+                    <input type="checkbox" value="255229134" data-name="NAVEENKUMAR C" data-reg="255229134" onchange="updatePreview()">
+                    255229134 — NAVEENKUMAR C
+                </label>
+                
+                <label class="student-item" data-name="nidheesh s" data-reg="255229135">
+                    <input type="checkbox" value="255229135" data-name="NIDHEESH S" data-reg="255229135" onchange="updatePreview()">
+                    255229135 — NIDHEESH S
+                </label>
+                
+                <label class="student-item" data-name="nirmal g" data-reg="255229136">
+                    <input type="checkbox" value="255229136" data-name="NIRMAL G" data-reg="255229136" onchange="updatePreview()">
+                    255229136 — NIRMAL G
+                </label>
+                
+                <label class="student-item" data-name="prasanth m" data-reg="255229137">
+                    <input type="checkbox" value="255229137" data-name="PRASANTH M" data-reg="255229137" onchange="updatePreview()">
+                    255229137 — PRASANTH M
+                </label>
+                
+                <label class="student-item" data-name="pravin v" data-reg="255229138">
+                    <input type="checkbox" value="255229138" data-name="PRAVIN V" data-reg="255229138" onchange="updatePreview()">
+                    255229138 — PRAVIN V
+                </label>
+                
+                <label class="student-item" data-name="prem selvan r" data-reg="255229139">
+                    <input type="checkbox" value="255229139" data-name="PREM SELVAN R" data-reg="255229139" onchange="updatePreview()">
+                    255229139 — PREM SELVAN R
+                </label>
+                
+                <label class="student-item" data-name="pricilla c" data-reg="255229140">
+                    <input type="checkbox" value="255229140" data-name="PRICILLA C" data-reg="255229140" onchange="updatePreview()">
+                    255229140 — PRICILLA C
+                </label>
+                
+                <label class="student-item" data-name="priya tharshini r" data-reg="255229141">
+                    <input type="checkbox" value="255229141" data-name="PRIYA THARSHINI R" data-reg="255229141" onchange="updatePreview()">
+                    255229141 — PRIYA THARSHINI R
+                </label>
+                
+                <label class="student-item" data-name="raja vignesh p" data-reg="255229142">
+                    <input type="checkbox" value="255229142" data-name="RAJA VIGNESH P" data-reg="255229142" onchange="updatePreview()">
+                    255229142 — RAJA VIGNESH P
+                </label>
+                
+                <label class="student-item" data-name="rajakumar azariah s" data-reg="255229143">
+                    <input type="checkbox" value="255229143" data-name="RAJAKUMAR AZARIAH S" data-reg="255229143" onchange="updatePreview()">
+                    255229143 — RAJAKUMAR AZARIAH S
+                </label>
+                
+                <label class="student-item" data-name="rithika m" data-reg="255229144">
+                    <input type="checkbox" value="255229144" data-name="RITHIKA M" data-reg="255229144" onchange="updatePreview()">
+                    255229144 — RITHIKA M
+                </label>
+                
+                <label class="student-item" data-name="saran b" data-reg="255229145">
+                    <input type="checkbox" value="255229145" data-name="SARAN B" data-reg="255229145" onchange="updatePreview()">
+                    255229145 — SARAN B
+                </label>
+                
+                <label class="student-item" data-name="sarmila banu a" data-reg="255229146">
+                    <input type="checkbox" value="255229146" data-name="SARMILA BANU A" data-reg="255229146" onchange="updatePreview()">
+                    255229146 — SARMILA BANU A
+                </label>
+                
+                <label class="student-item" data-name="selvakumar k" data-reg="255229147">
+                    <input type="checkbox" value="255229147" data-name="SELVAKUMAR K" data-reg="255229147" onchange="updatePreview()">
+                    255229147 — SELVAKUMAR K
+                </label>
+                
+                <label class="student-item" data-name="sivagami a" data-reg="255229148">
+                    <input type="checkbox" value="255229148" data-name="SIVAGAMI A" data-reg="255229148" onchange="updatePreview()">
+                    255229148 — SIVAGAMI A
+                </label>
+                
+                <label class="student-item" data-name="sivakumar e" data-reg="255229149">
+                    <input type="checkbox" value="255229149" data-name="SIVAKUMAR E" data-reg="255229149" onchange="updatePreview()">
+                    255229149 — SIVAKUMAR E
+                </label>
+                
+                <label class="student-item" data-name="sriram m" data-reg="255229150">
+                    <input type="checkbox" value="255229150" data-name="SRIRAM M" data-reg="255229150" onchange="updatePreview()">
+                    255229150 — SRIRAM M
+                </label>
+                
+                <label class="student-item" data-name="stanley wilson m" data-reg="255229151">
+                    <input type="checkbox" value="255229151" data-name="STANLEY WILSON M" data-reg="255229151" onchange="updatePreview()">
+                    255229151 — STANLEY WILSON M
+                </label>
+                
+                <label class="student-item" data-name="susmitha m" data-reg="255229152">
+                    <input type="checkbox" value="255229152" data-name="SUSMITHA M" data-reg="255229152" onchange="updatePreview()">
+                    255229152 — SUSMITHA M
+                </label>
+                
+                <label class="student-item" data-name="swathi s" data-reg="255229153">
+                    <input type="checkbox" value="255229153" data-name="SWATHI S" data-reg="255229153" onchange="updatePreview()">
+                    255229153 — SWATHI S
+                </label>
+                
+                <label class="student-item" data-name="thanusiya r" data-reg="255229154">
+                    <input type="checkbox" value="255229154" data-name="THANUSIYA R" data-reg="255229154" onchange="updatePreview()">
+                    255229154 — THANUSIYA R
+                </label>
+                
+                <label class="student-item" data-name="thirumalai rajan s" data-reg="255229155">
+                    <input type="checkbox" value="255229155" data-name="THIRUMALAI RAJAN S" data-reg="255229155" onchange="updatePreview()">
+                    255229155 — THIRUMALAI RAJAN S
+                </label>
+                
+                <label class="student-item" data-name="thirupugazh m" data-reg="255229156">
+                    <input type="checkbox" value="255229156" data-name="THIRUPUGAZH M" data-reg="255229156" onchange="updatePreview()">
+                    255229156 — THIRUPUGAZH M
+                </label>
+                
+                <label class="student-item" data-name="vijay v s" data-reg="255229157">
+                    <input type="checkbox" value="255229157" data-name="VIJAY V S" data-reg="255229157" onchange="updatePreview()">
+                    255229157 — VIJAY V S
+                </label>
+                
+                <label class="student-item" data-name="yogalakshmi k" data-reg="255229158">
+                    <input type="checkbox" value="255229158" data-name="YOGALAKSHMI K" data-reg="255229158" onchange="updatePreview()">
+                    255229158 — YOGALAKSHMI K
+                </label>
+                
+                <label class="student-item" data-name="jaya varshini i" data-reg="255229159">
+                    <input type="checkbox" value="255229159" data-name="JAYA VARSHINI I" data-reg="255229159" onchange="updatePreview()">
+                    255229159 — JAYA VARSHINI I
+                </label>
+                
+                <label class="student-item" data-name="keerthana sirja s" data-reg="255229161">
+                    <input type="checkbox" value="255229161" data-name="KEERTHANA SIRJA S" data-reg="255229161" onchange="updatePreview()">
+                    255229161 — KEERTHANA SIRJA S
+                </label>
+                
+                <label class="student-item" data-name="sharan kumar" data-reg="255229162">
+                    <input type="checkbox" value="255229162" data-name="SHARAN KUMAR" data-reg="255229162" onchange="updatePreview()">
+                    255229162 — SHARAN KUMAR
+                </label>
+                
+                <label class="student-item" data-name="lokesh" data-reg="255229163">
+                    <input type="checkbox" value="255229163" data-name="LOKESH" data-reg="255229163" onchange="updatePreview()">
+                    255229163 — LOKESH
+                </label>
+                
+            </div>
+        </div>
+
+        <button class="btn btn-download" onclick="downloadPDF()">Download Letter PDF</button>
     </div>
 
-    <div class="form-group">
-        <label>Who is asking for OD?</label>
-        <select id="input_requester_type" onchange="updatePreview()">
-            <option value="student" selected>Student</option>
-            <option value="event">Event Coordinator</option>
-            <option value="team">Technical Team</option>
-            <option value="other">Other</option>
-        </select>
-    </div>
-
-    <div class="form-group">
-        <label>Requester Name</label>
-        <input type="text" id="input_requester" placeholder="Student / Event Coordinator" oninput="updatePreview()">
-    </div>
-
-    <div class="form-group">
-        <label>Technical Team Leader</label>
-        <input type="text" id="input_tl_name" value="Kevin Lazarus B" oninput="updatePreview()">
-    </div>
-
-    <div class="form-group">
-        <label>Department</label>
-        <input type="text" id="input_dept" value="Data Science" oninput="updatePreview()">
-    </div>
-
-    <div class="form-group">
-        <label>College / Institution Name</label>
-        <input type="text" id="input_college" value="Bishop Heber College" oninput="updatePreview()">
-    </div>
-
-    <div class="form-group">
-        <label>Event Name</label>
-        <input type="text" id="input_event" placeholder="e.g. Intercollegiate Hackathon" oninput="updatePreview()">
-    </div>
-
-    <div class="form-group">
-        <label>Organizing Institution & Place</label>
-        <input type="text" id="input_organizer" value="College Name, Trichy" oninput="updatePreview()">
-    </div>
-
-    <div class="form-group">
-        <label>From Date</label>
-        <input type="date" id="input_from_date" oninput="updatePreview()">
-    </div>
-
-    <div class="form-group">
-        <label>To Date</label>
-        <input type="date" id="input_to_date" oninput="updatePreview()">
-    </div>
-
-    <hr style="border:0;border-top:1px solid rgba(0,0,0,.08);margin:25px 0">
-
-    <h3>Students List</h3>
-    <div id="student_inputs_container"></div>
-    <button type="button" class="btn btn-add-student" onclick="addStudentInput()">+ Add Student</button>
-
-    <button id="action_btn" class="btn btn-download" onclick="downloadPDF()">Download PDF</button>
-</div>
-
-<div class="preview-panel">
-    <div class="info-banner no-print">
-        <strong>Ready to generate.</strong> Fill the letter details and student list, then use <b>Download PDF</b>. No OTP or Telegram verification is required.
-    </div>
-
-    <div id="letter_body" class="letter-container">
-        <div class="right">
-            <span id="view_place"></span>
+    <div class="preview-panel">
+        <div id="letter_body" class="letter-container">
+            <div class="right">
+                <span id="view_place">Trichy</span><br>
+                <span id="view_date">11/09/2026</span>
+            </div>
             <br>
-            <span id="view_date"></span>
-        </div>
-
-        <br>
-
-        <div class="left">
-            <b>From</b><br>
-            <span id="view_from_name"></span><br>
-            <span id="view_from_designation"></span><br>
-            Department of <span id="view_dept_from"></span><br>
-            <span id="view_college_from"></span>
-        </div>
-
-        <br>
-
-        <div class="left">
-            <b>To</b><br>
-            The Head of the Department<br>
-            Department of <span id="view_dept_to"></span><br>
-            <span id="view_college_to"></span>
-        </div>
-
-        <div class="subject">
-            Subject: Request for Grant of On-Duty Permission
-            for Students Participating in
-            <span id="view_event_subj"></span>
-        </div>
-
-        <p>Respected Mam,</p>
-
-        <p class="content">
-            I respectfully submit that the following students of the Department of
-            <span id="view_dept_body"></span>
-            have registered to participate in
-            <b id="view_event_body"></b>
-            organized by
-            <b id="view_organizer_body"></b>
-            <span id="view_date_sentence"></span>.
-        </p>
-
-        <p class="content">
-            The event is of academic significance and will provide valuable exposure
-            to the participants. Therefore, I kindly request you to grant On-Duty (OD)
-            permission for the following students during the above mentioned period.
-        </p>
-
-        <center><p>Thank You</p></center>
-
-        <table class="signature-table">
-            <tr>
-                <td class="signature-cell">
-                    <p style="
-    margin-bottom: 0px;
-">Yours faithfully,</p>
-                   <strong style="
-    margin-top: 0px;
-"><span id="view_from_name_close">Kevin Lazarus B</span></strong>
-                    <span id="view_from_designation_close"></span>
-                </td>
-            </tr>
-        </table>
-
-        <table>
-            <thead>
-                <tr>
-                    <th>S.No</th>
-                    <th>Student Name</th>
-                    <th>Register Number</th>
-                    <th>Year</th>
-                    <th>Section</th>
+            <div class="left">
+                <b>From</b><br>
+                <span id="view_from_name">Kevin Lazarus B</span><br>
+                <span id="view_from_designation">Technical Head</span><br>
+                Department of <span id="view_dept_from">Data Science</span><br>
+                <span id="view_college_from">Bishop Heber College</span>
+            </div>
+            <br>
+            <div class="left">
+                <b>To</b><br>
+                The Head of the Department<br>
+                Department of <span id="view_dept_to">Data Science</span><br>
+                <span id="view_college_to">Bishop Heber College</span>
+            </div>
+            <div class="subject">
+                Subject: Request for Grant of On-Duty Permission for Students Participating in <span id="view_event_subj">________</span>
+            </div>
+            <p>Respected Sir/Mam,</p>
+            <p class="content">
+                I respectfully submit that the following students of the Department of <span id="view_dept_body">Data Science</span> have registered to participate in <b id="view_event_body">________</b> organized by <b id="view_organizer_body">________</b> <span id="view_date_sentence"> on <b>11/09/2026</b>.</span>
+            </p>
+            <p class="content">
+                The event is of academic significance and will provide valuable exposure. Therefore, I kindly request you to grant On-Duty (OD) permission for the selected participants.
+            </p>
+            <center><p>Thank You</p></center>
+            <table class="signature-table">
+                <tbody><tr>
+                    <td class="signature-cell">
+                        <p style="margin-bottom:0">Yours faithfully,</p>
+                        <strong style="margin-top:40px"><span id="view_from_name_close">Kevin Lazarus B</span></strong>
+                        
+ <br> <span id="view_from_designation_close">Technical Head</span>
+                    </td>
                 </tr>
-            </thead>
-            <tbody id="view_student_rows"></tbody>
-        </table>
-    </div>
-</div>
-</div>
-
-<!-- Premium PDF result modal -->
-<div id="pdf_modal" class="modal-backdrop no-print" aria-hidden="true">
-    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="pdf_modal_title">
-        <div id="pdf_modal_icon" class="modal-icon success">✓</div>
-        <h3 id="pdf_modal_title">PDF is ready</h3>
-        <p id="pdf_modal_message">Your On-Duty request letter has been generated successfully.</p>
-        <div class="modal-actions">
-            <button id="modal_download_btn" class="modal-primary" onclick="downloadPreparedPDF()">Download PDF</button>
-            <button id="modal_open_btn" class="modal-secondary" onclick="openPreparedPDF()">Open PDF</button>
-            <button class="modal-close" onclick="closePDFModal()">Close</button>
+            </tbody></table>
+            <table>
+                <thead>
+                    <tr>
+                        <th>S.No</th>
+                        <th>Student Name</th>
+                        <th>Register Number</th>
+                        <th>Year</th>
+                        <th>Section</th>
+                    </tr>
+                </thead>
+                <tbody id="view_student_rows"><tr><td colspan="5" style="color:#888">No students selected</td></tr></tbody>
+            </table>
         </div>
-        <p class="modal-hint">If your phone does not automatically save downloads, use <b>Open PDF</b> and choose your browser's download/share option.</p>
     </div>
 </div>
 
 <script>
-let students=[{name:"",regNo:"",year:"",section:"A"}];
-let preparedPdfBlob=null;
-let preparedPdfUrl=null;
-
-function formatDateString(dateVal){
-    if(!dateVal) return "________";
-    const dateObj=new Date(dateVal+"T00:00:00");
-    return dateObj.toLocaleDateString("en-GB",{day:"2-digit",month:"2-digit",year:"numeric"});
-}
-
-function sameDate(a,b){
-    return !!a && !!b && a===b;
-}
-
-function getFromDetails(){
-    const mode=document.getElementById("input_from_person").value;
-
-    if(mode==="kevin"){
-        return {
-            name:"Kevin Lazarus B",
-            designation:"Technical Head"
-        };
-    }
-
-    return {
-        name:document.getElementById("input_from_name").value.trim()||"___________",
-        designation:document.getElementById("input_from_class").value.trim()||"___________"
-    };
-}
-
-function handleFromPersonChange(){
-    const other=document.getElementById("other_from_fields");
-    other.classList.toggle("hidden",document.getElementById("input_from_person").value!=="other");
-    updatePreview();
+function formatDateString(val){
+    if(!val) return "________";
+    const d = new Date(val + "T00:00:00");
+    return d.toLocaleDateString("en-GB",{day:"2-digit",month:"2-digit",year:"numeric"});
 }
 
 function updatePreview(){
-    const date=document.getElementById("input_date").value;
-    const place=document.getElementById("input_place").value||"Trichy";
-    const dept=document.getElementById("input_dept").value||"___________";
-    const college=document.getElementById("input_college").value||"___________";
-    const eventName=document.getElementById("input_event").value||"___________";
-    const organizer=document.getElementById("input_organizer").value||"___________";
-    const fromDate=document.getElementById("input_from_date").value;
-    const toDate=document.getElementById("input_to_date").value;
-    const from=getFromDetails();
+    document.getElementById("view_date").innerText = formatDateString(document.getElementById("input_date").value);
+    document.getElementById("view_place").innerText = document.getElementById("input_place").value || "Trichy";
+    
+    const name = document.getElementById("input_from_name").value;
+    const des = document.getElementById("input_from_class").value;
+    document.getElementById("view_from_name").innerText = name;
+    document.getElementById("view_from_name_close").innerText = name;
+    document.getElementById("view_from_designation").innerText = des;
+    document.getElementById("view_from_designation_close").innerText = des;
 
-    document.getElementById("view_date").innerText=date?formatDateString(date):formatDateString(new Date().toISOString().slice(0,10));
-    document.getElementById("view_place").innerText=place;
+    const dept = document.getElementById("input_dept").value;
+    document.getElementById("view_dept_from").innerText = dept;
+    document.getElementById("view_dept_to").innerText = dept;
+    document.getElementById("view_dept_body").innerText = dept;
 
-    document.getElementById("view_from_name").innerText=from.name;
-    document.getElementById("view_from_name_close").innerText=from.name;
-    document.getElementById("view_from_designation").innerText=from.designation;
-    document.getElementById("view_from_designation_close").innerText=from.designation;
+    const college = document.getElementById("input_college").value;
+    document.getElementById("view_college_from").innerText = college;
+    document.getElementById("view_college_to").innerText = college;
 
-    document.getElementById("view_dept_from").innerText=dept;
-    document.getElementById("view_dept_to").innerText=dept;
-    document.getElementById("view_dept_body").innerText=dept;
+    const eventName = document.getElementById("input_event").value || "________";
+    document.getElementById("view_event_subj").innerText = eventName;
+    document.getElementById("view_event_body").innerText = eventName;
 
-    document.getElementById("view_college_from").innerText=college;
-    document.getElementById("view_college_to").innerText=college;
+    const organizer = document.getElementById("input_organizer").value || "________";
+    document.getElementById("view_organizer_body").innerText = organizer;
 
-    document.getElementById("view_event_subj").innerText=eventName;
-    document.getElementById("view_event_body").innerText=eventName;
-    document.getElementById("view_organizer_body").innerText=organizer;
-
-    let dateSentence;
-    if(!fromDate && !toDate){
-        dateSentence=".";
-    }else if(sameDate(fromDate,toDate)){
-        dateSentence=` on <b>${formatDateString(fromDate)}</b>.`;
-    }else{
-        const fromText=formatDateString(fromDate);
-        const toText=formatDateString(toDate);
-        dateSentence=` from <b>${fromText}</b> to <b>${toText}</b>.`;
+    const fromDate = document.getElementById("input_from_date").value;
+    const toDate = document.getElementById("input_to_date").value;
+    let dateStr = ".";
+    if(fromDate && toDate && fromDate === toDate){
+        dateStr = ` on <b>${formatDateString(fromDate)}</b>.`;
+    }else if(fromDate && toDate){
+        dateStr = ` from <b>${formatDateString(fromDate)}</b> to <b>${formatDateString(toDate)}</b>.`;
     }
-    document.getElementById("view_date_sentence").innerHTML=dateSentence;
+    document.getElementById("view_date_sentence").innerHTML = dateStr;
 
-    const tbody=document.getElementById("view_student_rows");
-    tbody.innerHTML="";
+    // Build student rows from selected checkboxes
+    const checkboxes = document.querySelectorAll('.student-picker input[type="checkbox"]:checked');
+    const tbody = document.getElementById("view_student_rows");
+    tbody.innerHTML = "";
 
-    students.forEach((student,index)=>{
-        const row=document.createElement("tr");
-        [index+1,student.name||"",student.regNo||"",student.year||"",student.section||""].forEach(value=>{
-            const td=document.createElement("td");
-            td.textContent=value;
+    if(checkboxes.length === 0){
+        tbody.innerHTML = `<tr><td colspan="5" style="color:#888">No students selected</td></tr>`;
+        return;
+    }
+
+    checkboxes.forEach((cb, idx) => {
+        const row = document.createElement("tr");
+        [idx + 1, cb.dataset.name, cb.dataset.reg, "II", "A"].forEach(val => {
+            const td = document.createElement("td");
+            td.textContent = val;
             row.appendChild(td);
         });
         tbody.appendChild(row);
     });
 }
 
-function showPDFModal(type,title,message){
-    const modal=document.getElementById("pdf_modal");
-    const icon=document.getElementById("pdf_modal_icon");
-    const downloadBtn=document.getElementById("modal_download_btn");
-    const openBtn=document.getElementById("modal_open_btn");
-
-    document.getElementById("pdf_modal_title").innerText=title;
-    document.getElementById("pdf_modal_message").innerText=message;
-
-    if(type==="error"){
-        icon.className="modal-icon error";
-        icon.innerText="!";
-        downloadBtn.style.display="none";
-        openBtn.style.display="none";
-    }else{
-        icon.className="modal-icon success";
-        icon.innerText="✓";
-        downloadBtn.style.display="";
-        openBtn.style.display="";
-    }
-
-    modal.classList.add("show");
-    modal.setAttribute("aria-hidden","false");
+function filterStudents(){
+    const query = document.getElementById("student_search").value.toLowerCase();
+    document.querySelectorAll('.student-item').forEach(item => {
+        const name = item.dataset.name;
+        const reg = item.dataset.reg;
+        if(name.includes(query) || reg.includes(query)){
+            item.style.display = "flex";
+        }else{
+            item.style.display = "none";
+        }
+    });
 }
 
-function closePDFModal(){
-    document.getElementById("pdf_modal").classList.remove("show");
-    document.getElementById("pdf_modal").setAttribute("aria-hidden","true");
-
-    if(preparedPdfUrl){
-        URL.revokeObjectURL(preparedPdfUrl);
-        preparedPdfUrl=null;
-    }
-    preparedPdfBlob=null;
-}
-
-function downloadPreparedPDF(){
-    if(!preparedPdfBlob) return;
-
-    if(!preparedPdfUrl){
-        preparedPdfUrl=URL.createObjectURL(preparedPdfBlob);
+async function extractBrochureDetails(){
+    const fileInput = document.getElementById("brochure_file");
+    if(fileInput.files.length === 0){
+        alert("Please select a brochure or invitation file first.");
+        return;
     }
 
-    const link=document.createElement("a");
-    link.href=preparedPdfUrl;
-    link.download="On-Duty-Request-Letter.pdf";
-    link.rel="noopener";
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-}
+    const formData = new FormData();
+    formData.append("file", fileInput.files[0]);
 
-function openPreparedPDF(){
-    if(!preparedPdfBlob) return;
-    if(!preparedPdfUrl) preparedPdfUrl=URL.createObjectURL(preparedPdfBlob);
-    window.open(preparedPdfUrl,"_blank","noopener,noreferrer");
+    const btn = event.target;
+    btn.textContent = "Extracting with Gemini AI...";
+    btn.disabled = true;
+
+    try {
+        const res = await fetch("/api/parse-brochure", { method: "POST", body: formData });
+        const data = await res.json();
+        
+        if(data.event_name) document.getElementById("input_event").value = data.event_name;
+        if(data.organizer) document.getElementById("input_organizer").value = data.organizer;
+        if(data.from_date) document.getElementById("input_from_date").value = data.from_date;
+        if(data.to_date) document.getElementById("input_to_date").value = data.to_date;
+        if(data.place) document.getElementById("input_place").value = data.place;
+
+        updatePreview();
+        alert("Event details successfully extracted and populated!");
+    } catch(err) {
+        alert("Failed to extract details: " + err.message);
+    } finally {
+        btn.textContent = "Extract & Fill via Gemini";
+        btn.disabled = false;
+    }
 }
 
 async function downloadPDF(){
-    const button=document.getElementById("action_btn");
-    const original=document.getElementById("letter_body");
+    const original = document.getElementById("letter_body");
+    const canvas = await html2canvas(original, { scale: 2, useCORS: true });
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
+    pdf.addImage(canvas.toDataURL("image/jpeg", 0.98), "JPEG", 0, 0, 210, 297);
+    pdf.save("On-Duty-Request-Letter.pdf");
+}
 
-    if(typeof window.html2canvas==="undefined" ||
-       !window.jspdf ||
-       typeof window.jspdf.jsPDF!=="function"){
-        showPDFModal(
-            "error",
-            "PDF engine unavailable",
-            "The PDF libraries did not load. Reload the page once and try again."
-        );
-        return;
-    }
-    if(!original){
-        showPDFModal("error","Letter not found","The letter content could not be found.");
-        return;
-    }
-
+document.addEventListener("DOMContentLoaded", () => {
+    const today = new Date().toISOString().slice(0,10);
+    document.getElementById("input_date").value = today;
+    document.getElementById("input_from_date").value = today;
+    document.getElementById("input_to_date").value = today;
     updatePreview();
-    button.disabled=true;
-    const oldText=button.innerText;
-    button.innerText="Generating PDF…";
-    let host=null;
-
-    try{
-        if(preparedPdfUrl){ URL.revokeObjectURL(preparedPdfUrl); preparedPdfUrl=null; }
-        preparedPdfBlob=null;
-
-        /*
-         * Capture a fully populated copy of the letter in a normal document
-         * layer. Hidden/off-screen clones are unreliable on Android Chrome.
-         */
-        host=document.createElement("div");
-        host.style.cssText="position:fixed;left:0;top:0;width:794px;height:1123px;background:#fff;z-index:2147483647;overflow:hidden;opacity:1;visibility:visible;pointer-events:none;";
-
-        const clone=original.cloneNode(true);
-        clone.removeAttribute("id");
-        clone.classList.remove("pdf-render");
-        clone.style.cssText="width:794px;height:1123px;min-height:1123px;margin:0;padding:83px 76px;background:#fff;color:#111827;box-shadow:none;overflow:hidden;position:relative;opacity:1;visibility:visible;font-family:'Times New Roman',serif;font-size:16px;line-height:1.55;";
-
-        host.appendChild(clone);
-        document.body.appendChild(host);
-
-        await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>setTimeout(r,250))));
-
-        const canvas=await html2canvas(clone,{
-            scale:2,
-            backgroundColor:"#ffffff",
-            useCORS:true,
-            allowTaint:false,
-            logging:false,
-            width:794,
-            height:1123,
-            windowWidth:794,
-            windowHeight:1123,
-            scrollX:0,
-            scrollY:0
-        });
-
-        if(!canvas || canvas.width<100 || canvas.height<100) throw new Error("Invalid PDF canvas");
-
-        /* Verify the canvas isn't completely white before creating the PDF. */
-        const sample=document.createElement("canvas");
-        sample.width=80; sample.height=80;
-        const ctx=sample.getContext("2d");
-        ctx.drawImage(canvas,0,0,80,80);
-        const pixels=ctx.getImageData(0,0,80,80).data;
-        let nonWhite=0;
-        for(let i=0;i<pixels.length;i+=4){
-            if(pixels[i]<245 || pixels[i+1]<245 || pixels[i+2]<245){ nonWhite++; if(nonWhite>20) break; }
-        }
-
-        /* Use the actual jsPDF object bundled by html2pdf. */
-        const jsPDF=(window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
-        if(!jsPDF) throw new Error("jsPDF is unavailable");
-
-        const pdf=new jsPDF({unit:"mm",format:"a4",orientation:"portrait",compress:true});
-        const imageData=canvas.toDataURL("image/jpeg",0.98);
-        pdf.addImage(imageData,"JPEG",0,0,210,297,undefined,"FAST");
-        preparedPdfBlob=pdf.output("blob");
-
-        if(!(preparedPdfBlob instanceof Blob) || preparedPdfBlob.size<1000 || nonWhite===0){
-            throw new Error("PDF canvas contains no visible letter content");
-        }
-
-        preparedPdfUrl=URL.createObjectURL(preparedPdfBlob);
-        showPDFModal("success","PDF is ready","The On-Duty request letter has been generated successfully. Choose Download PDF or Open PDF.");
-
-    }catch(error){
-        console.error("PDF generation failed:",error);
-        preparedPdfBlob=null;
-        showPDFModal("error","PDF generation failed","The PDF could not be generated on this device. Please reload the page and try again.");
-    }finally{
-        if(host) host.remove();
-        button.disabled=false;
-        button.innerText=oldText;
-    }
-}
-
-/* =========================
-   STUDENT INPUTS
-   ========================= */
-function escapeHtml(value){
-    return String(value||"")
-        .replaceAll("&","&amp;")
-        .replaceAll("<","&lt;")
-        .replaceAll(">","&gt;")
-        .replaceAll('"',"&quot;")
-        .replaceAll("'","&#039;");
-}
-
-function renderStudentInputs(){
-    const container=document.getElementById("student_inputs_container");
-    container.innerHTML="";
-
-    students.forEach((student,index)=>{
-        const div=document.createElement("div");
-        div.className="student-entry";
-
-        div.innerHTML=`
-            <div style="font-weight:600;margin-bottom:8px;display:flex;justify-content:space-between;color:#475569">
-                <span>Student #${index+1}</span>
-                <span style="color:#ef4444;cursor:pointer;font-weight:700" onclick="removeStudent(${index})">Remove</span>
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-                <input type="text" placeholder="Name"
-                    value="${escapeHtml(student.name)}"
-                    oninput="updateStudentData(${index},'name',this.value)">
-                <input type="text" placeholder="Reg No"
-                    value="${escapeHtml(student.regNo)}"
-                    oninput="updateStudentData(${index},'regNo',this.value)">
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-                <input type="text" placeholder="Year"
-                    value="${escapeHtml(student.year)}"
-                    oninput="updateStudentData(${index},'year',this.value)">
-                <input type="text" placeholder="Section"
-                    value="${escapeHtml(student.section)}"
-                    oninput="updateStudentData(${index},'section',this.value)">
-            </div>
-        `;
-
-        container.appendChild(div);
-    });
-}
-
-function addStudentInput(){
-    students.push({name:"",regNo:"",year:"",section:""});
-    renderStudentInputs();
-    updatePreview();
-}
-
-function removeStudent(index){
-    if(students.length===1){
-        showPDFModal("error","Cannot remove student","At least one student entry is required.");
-        return;
-    }
-
-    students.splice(index,1);
-    renderStudentInputs();
-    updatePreview();
-}
-
-function updateStudentData(index,field,value){
-    students[index][field]=value;
-    updatePreview();
-}
-
-/* =========================
-   INITIALIZATION
-   ========================= */
-document.addEventListener("DOMContentLoaded",()=>{
-    const today=new Date();
-    const iso=today.toISOString().slice(0,10);
-
-    document.getElementById("input_date").value=iso;
-    document.getElementById("input_from_date").value=iso;
-    document.getElementById("input_to_date").value=iso;
-
-    renderStudentInputs();
-    updatePreview();
-
-    if(typeof window.html2canvas==="undefined" ||
-       !window.jspdf ||
-       typeof window.jspdf.jsPDF!=="function"){
-        console.error("PDF libraries failed to load.");
-    }else{
-        console.log("PDF libraries loaded successfully.");
-    }
-
-    document.getElementById("pdf_modal").addEventListener("click",event=>{
-        if(event.target.id==="pdf_modal") closePDFModal();
-    });
-
-    document.addEventListener("keydown",event=>{
-        if(event.key==="Escape") closePDFModal();
-    });
 });
 </script>
-</body>
-</html>
+
+</body><chatgpt-sidebar data-rendered="true" data-gpts-theme="light"></chatgpt-sidebar></html>
