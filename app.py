@@ -99,9 +99,7 @@ if GEMINI_API_KEY and genai is not None:
         client = None
 
 
-# ============================================================
-# DATABASE
-# ============================================================
+
 
 DEFAULT_STUDENTS = [
     ("Student One", "DS001", "I M.Sc", "A", "", ""),
@@ -112,7 +110,7 @@ DEFAULT_STUDENTS = [
 
 def get_db():
     """
-    Open a SQLite connection.
+    Open SQLite database connection.
     """
     connection = sqlite3.connect(
         DATABASE_PATH,
@@ -124,36 +122,289 @@ def get_db():
     return connection
 
 
+def table_exists(connection, table_name):
+    """
+    Check whether a SQLite table exists.
+    """
+
+    row = connection.execute(
+        """
+        SELECT name
+        FROM sqlite_master
+        WHERE type = 'table'
+        AND name = ?
+        """,
+        (table_name,),
+    ).fetchone()
+
+    return row is not None
+
+
+def get_table_columns(connection, table_name):
+    """
+    Return existing column names for a table.
+    """
+
+    rows = connection.execute(
+        f"PRAGMA table_info({table_name})"
+    ).fetchall()
+
+    return {
+        row["name"]
+        for row in rows
+    }
+
+
 def init_db():
     """
-    Create the students table if it does not exist.
+    Create or migrate the students table.
+
+    This is intentionally migration-friendly so an older
+    database.db does not break when the application is updated.
     """
 
     try:
         connection = get_db()
 
-        connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS students (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                register_number TEXT UNIQUE NOT NULL,
-                year TEXT,
-                section TEXT,
-                email TEXT,
-                phone TEXT
-            )
-            """
-        )
+        # ----------------------------------------------------
+        # Create table if it doesn't exist
+        # ----------------------------------------------------
 
-        existing = connection.execute(
-            "SELECT COUNT(*) AS count FROM students"
+        if not table_exists(
+            connection,
+            "students"
+        ):
+            connection.execute(
+                """
+                CREATE TABLE students (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    register_number TEXT UNIQUE NOT NULL,
+                    year TEXT,
+                    section TEXT,
+                    email TEXT,
+                    phone TEXT
+                )
+                """
+            )
+
+            print(
+                "Created new students table."
+            )
+
+        else:
+            # ------------------------------------------------
+            # Existing table
+            # ------------------------------------------------
+
+            columns = get_table_columns(
+                connection,
+                "students"
+            )
+
+            print(
+                "Existing student columns:",
+                sorted(columns)
+            )
+
+            # --------------------------------------------
+            # Add missing columns
+            # --------------------------------------------
+
+            if "id" not in columns:
+                print(
+                    "WARNING: Existing students table "
+                    "does not contain an id column."
+                )
+
+                # SQLite cannot normally add a PRIMARY KEY
+                # AUTOINCREMENT column using ALTER TABLE.
+                #
+                # Therefore recreate the table while preserving
+                # the existing student data.
+
+                old_columns = columns
+
+                connection.execute(
+                    """
+                    ALTER TABLE students
+                    RENAME TO students_old
+                    """
+                )
+
+                connection.execute(
+                    """
+                    CREATE TABLE students (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        name TEXT NOT NULL,
+                        register_number TEXT UNIQUE NOT NULL,
+                        year TEXT,
+                        section TEXT,
+                        email TEXT,
+                        phone TEXT
+                    )
+                    """
+                )
+
+                old_info = connection.execute(
+                    """
+                    PRAGMA table_info(students_old)
+                    """
+                ).fetchall()
+
+                old_column_names = {
+                    row["name"]
+                    for row in old_info
+                }
+
+                # Determine which old fields can be preserved.
+                name_column = (
+                    "name"
+                    if "name" in old_column_names
+                    else None
+                )
+
+                register_column = None
+
+                if "register_number" in old_column_names:
+                    register_column = "register_number"
+
+                elif "register_no" in old_column_names:
+                    register_column = "register_no"
+
+                elif "registerNumber" in old_column_names:
+                    register_column = "registerNumber"
+
+                year_column = (
+                    "year"
+                    if "year" in old_column_names
+                    else None
+                )
+
+                section_column = (
+                    "section"
+                    if "section" in old_column_names
+                    else None
+                )
+
+                email_column = (
+                    "email"
+                    if "email" in old_column_names
+                    else None
+                )
+
+                phone_column = (
+                    "phone"
+                    if "phone" in old_column_names
+                    else None
+                )
+
+                # We can preserve the old data only if the
+                # essential columns are available.
+                if name_column and register_column:
+
+                    select_parts = [
+                        f'"{name_column}"',
+                        f'"{register_column}"',
+                        (
+                            f'"{year_column}"'
+                            if year_column
+                            else "''"
+                        ),
+                        (
+                            f'"{section_column}"'
+                            if section_column
+                            else "''"
+                        ),
+                        (
+                            f'"{email_column}"'
+                            if email_column
+                            else "''"
+                        ),
+                        (
+                            f'"{phone_column}"'
+                            if phone_column
+                            else "''"
+                        ),
+                    ]
+
+                    connection.execute(
+                        f"""
+                        INSERT OR IGNORE INTO students
+                        (
+                            name,
+                            register_number,
+                            year,
+                            section,
+                            email,
+                            phone
+                        )
+                        SELECT
+                            {", ".join(select_parts)}
+                        FROM students_old
+                        """
+                    )
+
+                # Remove temporary old table.
+                connection.execute(
+                    "DROP TABLE students_old"
+                )
+
+                print(
+                    "Migrated old students table successfully."
+                )
+
+            else:
+                # --------------------------------------------
+                # ID exists; add any other missing columns.
+                # --------------------------------------------
+
+                required_columns = {
+                    "name": "TEXT",
+                    "register_number": "TEXT",
+                    "year": "TEXT",
+                    "section": "TEXT",
+                    "email": "TEXT",
+                    "phone": "TEXT",
+                }
+
+                for column_name, column_type in (
+                    required_columns.items()
+                ):
+
+                    if column_name not in columns:
+
+                        connection.execute(
+                            f"""
+                            ALTER TABLE students
+                            ADD COLUMN {column_name}
+                            {column_type}
+                            """
+                        )
+
+                        print(
+                            f"Added missing column: "
+                            f"{column_name}"
+                        )
+
+        # ----------------------------------------------------
+        # Check whether students exist
+        # ----------------------------------------------------
+
+        count_row = connection.execute(
+            """
+            SELECT COUNT(*) AS count
+            FROM students
+            """
         ).fetchone()
 
-        if existing["count"] == 0:
+        student_count = count_row["count"]
+
+        if student_count == 0:
+
             connection.executemany(
                 """
-                INSERT INTO students
+                INSERT OR IGNORE INTO students
                 (
                     name,
                     register_number,
@@ -167,12 +418,30 @@ def init_db():
                 DEFAULT_STUDENTS,
             )
 
+            print(
+                "Inserted default students."
+            )
+
         connection.commit()
         connection.close()
 
-    except Exception as exc:
-        print(f"Database initialization warning: {exc}")
+        print(
+            f"Database ready. Students: "
+            f"{student_count}"
+        )
 
+    except Exception as exc:
+
+        print(
+            "DATABASE INITIALIZATION ERROR:",
+            repr(exc)
+        )
+
+        try:
+            connection.rollback()
+            connection.close()
+        except Exception:
+            pass
 
 # Initialize when the module is imported by Vercel.
 init_db()
