@@ -78,16 +78,16 @@ SECRET_KEY = os.getenv(
     "odletter-development-secret"
 )
 
+GEMINI_MODEL = "gemini-2.5-flash"
 
-gemini_client = None
+client = None
 
-if GEMINI_API_KEY:
-    gemini_client = genai.Client(api_key=GEMINI_API_KEY)
-
-response = gemini_client.models.generate_content(
-    model="gemini-2.5-flash",
-    contents=prompt
-)
+if GEMINI_API_KEY and genai is not None:
+    try:
+        client = genai.Client(api_key=GEMINI_API_KEY)
+    except Exception as exc:
+        print(f"Gemini client initialization failed: {exc}")
+        client = None
 
 
 # ============================================================
@@ -104,29 +104,6 @@ app.secret_key = SECRET_KEY
 
 # Maximum uploaded file size = 15 MB
 app.config["MAX_CONTENT_LENGTH"] = 15 * 1024 * 1024
-
-
-# ============================================================
-# GEMINI CLIENT
-# ============================================================
-
-client = None
-
-if GEMINI_API_KEY and genai is not None:
-
-    try:
-
-        client = genai.Client(
-            api_key=GEMINI_API_KEY
-        )
-
-    except Exception as exc:
-
-        print(
-            f"Gemini client initialization failed: {exc}"
-        )
-
-        client = None
 
 
 # ============================================================
@@ -147,30 +124,15 @@ def clean_text(value):
 def get_students():
     """
     Read students from students.csv.
-
-    Expected CSV format:
-
-        reg_no,name,year,section
-
-    Example:
-
-        255229101,ABDUL RASIK S,II,A
-        255229102,ABISHEIK RUBAN C,II,A
     """
 
     students = []
 
     if not STUDENTS_FILE.exists():
-
-        print(
-            f"Student CSV not found: {STUDENTS_FILE}"
-        )
-
+        print(f"Student CSV not found: {STUDENTS_FILE}")
         return []
 
-
     try:
-
         with open(
             STUDENTS_FILE,
             "r",
@@ -181,29 +143,14 @@ def get_students():
             reader = csv.DictReader(file)
 
             if not reader.fieldnames:
-
-                print(
-                    "Student CSV has no header row."
-                )
-
+                print("Student CSV has no header row.")
                 return []
-
 
             # Normalize column names.
             fieldnames = [
                 clean_text(field).lower()
                 for field in reader.fieldnames
             ]
-
-            print(
-                "Student CSV columns:",
-                fieldnames
-            )
-
-
-            # ------------------------------------------------
-            # Validate required columns
-            # ------------------------------------------------
 
             required_columns = {
                 "reg_no",
@@ -218,26 +165,16 @@ def get_students():
             )
 
             if missing_columns:
-
                 print(
                     "Student CSV missing columns:",
                     sorted(missing_columns)
                 )
-
                 return []
 
-
-            # ------------------------------------------------
-            # Read rows
-            # ------------------------------------------------
-
             for row in reader:
-
-                # Convert keys to lowercase and trim.
                 normalized_row = {}
 
                 for key, value in row.items():
-
                     if key is None:
                         continue
 
@@ -248,7 +185,6 @@ def get_students():
                     normalized_row[
                         normalized_key
                     ] = clean_text(value)
-
 
                 reg_no = clean_text(
                     normalized_row.get("reg_no")
@@ -266,11 +202,8 @@ def get_students():
                     normalized_row.get("section")
                 )
 
-
-                # Ignore completely empty rows.
                 if not reg_no and not name:
                     continue
-
 
                 students.append(
                     {
@@ -289,8 +222,6 @@ def get_students():
                     }
                 )
 
-
-        # Sort alphabetically by name.
         students.sort(
             key=lambda student: (
                 student["name"].lower()
@@ -303,13 +234,8 @@ def get_students():
 
         return students
 
-
     except Exception as exc:
-
-        print(
-            f"Student CSV error: {exc}"
-        )
-
+        print(f"Student CSV error: {exc}")
         return []
 
 
@@ -319,9 +245,7 @@ def get_students():
 
 @app.route("/", methods=["GET"])
 def index():
-
     students = get_students()
-
     return render_template(
         "index.html",
         students=students,
@@ -334,9 +258,7 @@ def index():
 
 @app.route("/api/health", methods=["GET"])
 def health():
-
     students = get_students()
-
     return jsonify(
         {
             "success": True,
@@ -355,9 +277,7 @@ def health():
 
 @app.route("/api/students", methods=["GET"])
 def students_api():
-
     students = get_students()
-
     return jsonify(
         {
             "success": True,
@@ -372,22 +292,10 @@ def students_api():
 # ============================================================
 
 def normalize_date(value):
-    """
-    Convert common date formats into DD/MM/YYYY.
-
-    Supported:
-
-        2026-09-12
-        12/09/2026
-        12-09-2026
-        2026/09/12
-    """
-
     value = clean_text(value)
 
     if not value:
         return ""
-
 
     formats = [
         "%Y-%m-%d",
@@ -396,24 +304,17 @@ def normalize_date(value):
         "%Y/%m/%d",
     ]
 
-
     for fmt in formats:
-
         try:
-
             parsed = datetime.strptime(
                 value,
                 fmt,
             )
-
             return parsed.strftime(
                 "%d/%m/%Y"
             )
-
         except ValueError:
-
             continue
-
 
     return value
 
@@ -422,18 +323,6 @@ def event_date_sentence(
     from_date,
     to_date,
 ):
-    """
-    Generate deterministic OD wording.
-
-    Same day:
-
-        on 12/09/2026
-
-    Multiple days:
-
-        from 12/09/2026 to 14/09/2026
-    """
-
     from_date = normalize_date(
         from_date
     )
@@ -442,19 +331,14 @@ def event_date_sentence(
         to_date
     )
 
-
     if not from_date:
-
         return "on the specified date"
-
 
     if (
         not to_date
         or from_date == to_date
     ):
-
         return f"on {from_date}"
-
 
     return (
         f"from {from_date} "
@@ -467,14 +351,11 @@ def event_date_sentence(
 # ============================================================
 
 def extract_json_from_text(text):
-
     text = clean_text(text)
 
     if not text:
         return {}
 
-
-    # Remove markdown code fences.
     text = re.sub(
         r"```json\s*",
         "",
@@ -491,36 +372,24 @@ def extract_json_from_text(text):
 
     text = text.strip()
 
-
     try:
-
         return json.loads(text)
-
     except json.JSONDecodeError:
-
         pass
 
-
-    # Try finding JSON object inside response.
     match = re.search(
         r"\{.*\}",
         text,
         flags=re.DOTALL,
     )
 
-
     if match:
-
         try:
-
             return json.loads(
                 match.group(0)
             )
-
         except json.JSONDecodeError:
-
             pass
-
 
     return {}
 
@@ -534,13 +403,7 @@ def extract_json_from_text(text):
     methods=["POST"],
 )
 def parse_brochure():
-
-    # --------------------------------------------------------
-    # Check uploaded file
-    # --------------------------------------------------------
-
     if "file" not in request.files:
-
         return jsonify(
             {
                 "success": False,
@@ -548,28 +411,17 @@ def parse_brochure():
             }
         ), 400
 
-
     uploaded_file = request.files["file"]
 
-
     if not uploaded_file.filename:
-
         return jsonify(
             {
                 "success": False,
-                "error": (
-                    "Uploaded file has no filename."
-                ),
+                "error": "Uploaded file has no filename.",
             }
         ), 400
 
-
-    # --------------------------------------------------------
-    # Check Gemini
-    # --------------------------------------------------------
-
     if client is None:
-
         return jsonify(
             {
                 "success": False,
@@ -581,14 +433,10 @@ def parse_brochure():
             }
         ), 503
 
-
     try:
-
         file_bytes = uploaded_file.read()
 
-
         if not file_bytes:
-
             return jsonify(
                 {
                     "success": False,
@@ -596,16 +444,10 @@ def parse_brochure():
                 }
             ), 400
 
-
         mime_type = (
             uploaded_file.mimetype
             or "application/pdf"
         )
-
-
-        # ----------------------------------------------------
-        # Extraction prompt
-        # ----------------------------------------------------
 
         prompt = """
 You are an event-information extraction system.
@@ -656,11 +498,6 @@ Rules:
 10. Return JSON only.
 """
 
-
-        # ----------------------------------------------------
-        # Gemini
-        # ----------------------------------------------------
-
         response = client.models.generate_content(
             model=GEMINI_MODEL,
             contents=[
@@ -681,64 +518,41 @@ Rules:
             ],
         )
 
-
         response_text = getattr(
             response,
             "text",
             "",
         )
 
-
         extracted = extract_json_from_text(
             response_text
         )
 
-
         result = {
             "event_name": clean_text(
-                extracted.get(
-                    "event_name",
-                    ""
-                )
+                extracted.get("event_name", "")
             ),
             "organizer": clean_text(
-                extracted.get(
-                    "organizer",
-                    ""
-                )
+                extracted.get("organizer", "")
             ),
             "from_date": clean_text(
-                extracted.get(
-                    "from_date",
-                    ""
-                )
+                extracted.get("from_date", "")
             ),
             "to_date": clean_text(
-                extracted.get(
-                    "to_date",
-                    ""
-                )
+                extracted.get("to_date", "")
             ),
             "place": clean_text(
-                extracted.get(
-                    "place",
-                    ""
-                )
+                extracted.get("place", "")
             ),
         }
 
-
-        # If Gemini gave only one date,
-        # treat it as a one-day event.
         if (
             result["from_date"]
             and not result["to_date"]
         ):
-
             result["to_date"] = (
                 result["from_date"]
             )
-
 
         return jsonify(
             {
@@ -747,13 +561,8 @@ Rules:
             }
         )
 
-
     except Exception as exc:
-
-        print(
-            f"Brochure extraction error: {exc}"
-        )
-
+        print(f"Brochure extraction error: {exc}")
         return jsonify(
             {
                 "success": False,
@@ -775,13 +584,7 @@ Rules:
     methods=["POST"],
 )
 def generate_pdf():
-
-    # --------------------------------------------------------
-    # ReportLab availability
-    # --------------------------------------------------------
-
     if not REPORTLAB_AVAILABLE:
-
         return jsonify(
             {
                 "success": False,
@@ -792,75 +595,49 @@ def generate_pdf():
             }
         ), 503
 
-
-    # --------------------------------------------------------
-    # Read JSON
-    # --------------------------------------------------------
-
     data = request.get_json(
         silent=True
     ) or {}
 
-
     event_name = clean_text(
         data.get("event_name")
     )
-
     organizer = clean_text(
         data.get("organizer")
     )
-
     from_date = clean_text(
         data.get("from_date")
     )
-
     to_date = clean_text(
         data.get("to_date")
     )
-
     place = clean_text(
         data.get("place")
     )
-
     from_name = clean_text(
         data.get("from_name")
         or "Kevin Lazarus B"
     )
-
     designation = clean_text(
         data.get("designation")
     )
-
     college = clean_text(
         data.get("college")
         or "Bishop Heber College"
     )
-
     department = clean_text(
         data.get("department")
         or "Department of Data Science"
     )
-
     selected_students = data.get(
         "students",
         []
     )
 
-
-    if not isinstance(
-        selected_students,
-        list,
-    ):
-
+    if not isinstance(selected_students, list):
         selected_students = []
 
-
-    # --------------------------------------------------------
-    # Validation
-    # --------------------------------------------------------
-
     if not event_name:
-
         return jsonify(
             {
                 "success": False,
@@ -868,31 +645,20 @@ def generate_pdf():
             }
         ), 400
 
-
     if not selected_students:
-
         return jsonify(
             {
                 "success": False,
-                "error": (
-                    "Select at least one student."
-                ),
+                "error": "Select at least one student.",
             }
         ), 400
-
 
     date_sentence = event_date_sentence(
         from_date,
         to_date,
     )
 
-
-    # --------------------------------------------------------
-    # Create PDF in memory
-    # --------------------------------------------------------
-
     pdf_buffer = io.BytesIO()
-
 
     document = SimpleDocTemplate(
         pdf_buffer,
@@ -905,9 +671,7 @@ def generate_pdf():
         author="OD Letter Generator",
     )
 
-
     styles = getSampleStyleSheet()
-
 
     title_style = ParagraphStyle(
         "ODTitle",
@@ -918,14 +682,12 @@ def generate_pdf():
         spaceAfter=10,
     )
 
-
     department_style = ParagraphStyle(
         "Department",
         parent=title_style,
         fontSize=12,
         leading=16,
     )
-
 
     body_style = ParagraphStyle(
         "ODBody",
@@ -936,17 +698,7 @@ def generate_pdf():
         spaceAfter=10,
     )
 
-
-    # --------------------------------------------------------
-    # Story
-    # --------------------------------------------------------
-
     story = []
-
-
-    # --------------------------------------------------------
-    # College header
-    # --------------------------------------------------------
 
     story.append(
         Paragraph(
@@ -955,7 +707,6 @@ def generate_pdf():
         )
     )
 
-
     story.append(
         Paragraph(
             f"<b>{department}</b>",
@@ -963,14 +714,7 @@ def generate_pdf():
         )
     )
 
-
-    story.append(
-        Spacer(
-            1,
-            10,
-        )
-    )
-
+    story.append(Spacer(1, 10))
 
     story.append(
         Paragraph(
@@ -979,18 +723,7 @@ def generate_pdf():
         )
     )
 
-
-    story.append(
-        Spacer(
-            1,
-            8,
-        )
-    )
-
-
-    # --------------------------------------------------------
-    # From
-    # --------------------------------------------------------
+    story.append(Spacer(1, 8))
 
     from_block = (
         "<b>From</b><br/>"
@@ -998,18 +731,12 @@ def generate_pdf():
         f"{designation}"
     )
 
-
     story.append(
         Paragraph(
             from_block,
             body_style,
         )
     )
-
-
-    # --------------------------------------------------------
-    # To
-    # --------------------------------------------------------
 
     story.append(
         Paragraph(
@@ -1021,17 +748,11 @@ def generate_pdf():
         )
     )
 
-
-    # --------------------------------------------------------
-    # Subject
-    # --------------------------------------------------------
-
     subject = (
         "<b>Subject:</b> Request for "
         "On-Duty permission to attend "
         f"{event_name}"
     )
-
 
     story.append(
         Paragraph(
@@ -1040,69 +761,27 @@ def generate_pdf():
         )
     )
 
-
-    story.append(
-        Spacer(
-            1,
-            4,
-        )
-    )
-
-
-    # --------------------------------------------------------
-    # Event details
-    # --------------------------------------------------------
+    story.append(Spacer(1, 4))
 
     event_details = []
 
-
     if event_name:
-
-        event_details.append(
-            [
-                "Event",
-                event_name,
-            ]
-        )
-
+        event_details.append(["Event", event_name])
 
     if organizer:
-
-        event_details.append(
-            [
-                "Organizer",
-                organizer,
-            ]
-        )
-
+        event_details.append(["Organizer", organizer])
 
     if place:
-
-        event_details.append(
-            [
-                "Venue",
-                place,
-            ]
-        )
-
+        event_details.append(["Venue", place])
 
     if from_date:
-
         display_date = (
             date_sentence
             .replace("on ", "", 1)
         )
-
-        event_details.append(
-            [
-                "Date",
-                display_date,
-            ]
-        )
-
+        event_details.append(["Date", display_date])
 
     if event_details:
-
         table = Table(
             event_details,
             colWidths=[
@@ -1111,84 +790,24 @@ def generate_pdf():
             ],
         )
 
-
         table.setStyle(
             TableStyle(
                 [
-                    (
-                        "GRID",
-                        (0, 0),
-                        (-1, -1),
-                        0.5,
-                        colors.grey,
-                    ),
-                    (
-                        "VALIGN",
-                        (0, 0),
-                        (-1, -1),
-                        "TOP",
-                    ),
-                    (
-                        "FONTNAME",
-                        (0, 0),
-                        (0, -1),
-                        "Helvetica-Bold",
-                    ),
-                    (
-                        "FONTNAME",
-                        (1, 0),
-                        (1, -1),
-                        "Helvetica",
-                    ),
-                    (
-                        "FONTSIZE",
-                        (0, 0),
-                        (-1, -1),
-                        9,
-                    ),
-                    (
-                        "LEFTPADDING",
-                        (0, 0),
-                        (-1, -1),
-                        6,
-                    ),
-                    (
-                        "RIGHTPADDING",
-                        (0, 0),
-                        (-1, -1),
-                        6,
-                    ),
-                    (
-                        "TOPPADDING",
-                        (0, 0),
-                        (-1, -1),
-                        6,
-                    ),
-                    (
-                        "BOTTOMPADDING",
-                        (0, 0),
-                        (-1, -1),
-                        6,
-                    ),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+                    ("FONTNAME", (1, 0), (1, -1), "Helvetica"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 9),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                    ("TOPPADDING", (0, 0), (-1, -1), 6),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
                 ]
             )
         )
 
-
         story.append(table)
-
-
-        story.append(
-            Spacer(
-                1,
-                12,
-            )
-        )
-
-
-    # --------------------------------------------------------
-    # Student table
-    # --------------------------------------------------------
+        story.append(Spacer(1, 12))
 
     student_rows = [
         [
@@ -1198,41 +817,22 @@ def generate_pdf():
         ]
     ]
 
-
     for index, student in enumerate(
         selected_students,
         start=1,
     ):
-
-        if isinstance(
-            student,
-            dict,
-        ):
-
+        if isinstance(student, dict):
             student_name = clean_text(
                 student.get("name")
             )
-
             register_number = clean_text(
-                student.get(
-                    "register_number"
-                )
-                or student.get(
-                    "reg_no"
-                )
-                or student.get(
-                    "registerNumber"
-                )
+                student.get("register_number")
+                or student.get("reg_no")
+                or student.get("registerNumber")
             )
-
         else:
-
-            student_name = clean_text(
-                student
-            )
-
+            student_name = clean_text(student)
             register_number = ""
-
 
         student_rows.append(
             [
@@ -1241,7 +841,6 @@ def generate_pdf():
                 register_number,
             ]
         )
-
 
     student_table = Table(
         student_rows,
@@ -1253,80 +852,23 @@ def generate_pdf():
         repeatRows=1,
     )
 
-
     student_table.setStyle(
         TableStyle(
             [
-                (
-                    "GRID",
-                    (0, 0),
-                    (-1, -1),
-                    0.5,
-                    colors.grey,
-                ),
-                (
-                    "BACKGROUND",
-                    (0, 0),
-                    (-1, 0),
-                    colors.lightgrey,
-                ),
-                (
-                    "FONTNAME",
-                    (0, 0),
-                    (-1, 0),
-                    "Helvetica-Bold",
-                ),
-                (
-                    "FONTSIZE",
-                    (0, 0),
-                    (-1, -1),
-                    9,
-                ),
-                (
-                    "ALIGN",
-                    (0, 0),
-                    (0, -1),
-                    "CENTER",
-                ),
-                (
-                    "VALIGN",
-                    (0, 0),
-                    (-1, -1),
-                    "MIDDLE",
-                ),
-                (
-                    "TOPPADDING",
-                    (0, 0),
-                    (-1, -1),
-                    6,
-                ),
-                (
-                    "BOTTOMPADDING",
-                    (0, 0),
-                    (-1, -1),
-                    6,
-                ),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 9),
+                ("ALIGN", (0, 0), (0, -1), "CENTER"),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("TOPPADDING", (0, 0), (-1, -1), 6),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
             ]
         )
     )
 
-
-    story.append(
-        student_table
-    )
-
-
-    story.append(
-        Spacer(
-            1,
-            15,
-        )
-    )
-
-
-    # --------------------------------------------------------
-    # Request paragraph
-    # --------------------------------------------------------
+    story.append(student_table)
+    story.append(Spacer(1, 15))
 
     request_text = (
         "I kindly request that the "
@@ -1336,24 +878,13 @@ def generate_pdf():
         f"{date_sentence}"
     )
 
-
     if place:
-
-        request_text += (
-            f" at <b>{place}</b>"
-        )
-
+        request_text += f" at <b>{place}</b>"
 
     if organizer:
-
-        request_text += (
-            f", organized by "
-            f"<b>{organizer}</b>"
-        )
-
+        request_text += f", organized by <b>{organizer}</b>"
 
     request_text += "."
-
 
     story.append(
         Paragraph(
@@ -1362,18 +893,7 @@ def generate_pdf():
         )
     )
 
-
-    story.append(
-        Spacer(
-            1,
-            25,
-        )
-    )
-
-
-    # --------------------------------------------------------
-    # Signature
-    # --------------------------------------------------------
+    story.append(Spacer(1, 25))
 
     story.append(
         Paragraph(
@@ -1382,14 +902,7 @@ def generate_pdf():
         )
     )
 
-
-    story.append(
-        Spacer(
-            1,
-            18,
-        )
-    )
-
+    story.append(Spacer(1, 18))
 
     story.append(
         Paragraph(
@@ -1401,22 +914,9 @@ def generate_pdf():
         )
     )
 
-
-    # --------------------------------------------------------
-    # Build PDF
-    # --------------------------------------------------------
-
-    document.build(
-        story
-    )
-
+    document.build(story)
 
     pdf_buffer.seek(0)
-
-
-    # --------------------------------------------------------
-    # Safe filename
-    # --------------------------------------------------------
 
     safe_event_name = re.sub(
         r"[^A-Za-z0-9_-]+",
@@ -1424,13 +924,11 @@ def generate_pdf():
         event_name,
     ).strip("_")
 
-
     filename = (
         "OD_Letter_"
         f"{safe_event_name or 'Event'}"
         ".pdf"
     )
-
 
     return send_file(
         pdf_buffer,
@@ -1446,7 +944,6 @@ def generate_pdf():
 
 @app.errorhandler(404)
 def not_found(error):
-
     return jsonify(
         {
             "success": False,
@@ -1457,7 +954,6 @@ def not_found(error):
 
 @app.errorhandler(413)
 def file_too_large(error):
-
     return jsonify(
         {
             "success": False,
@@ -1471,11 +967,7 @@ def file_too_large(error):
 
 @app.errorhandler(500)
 def internal_error(error):
-
-    print(
-        f"Internal server error: {error}"
-    )
-
+    print(f"Internal server error: {error}")
     return jsonify(
         {
             "success": False,
@@ -1489,48 +981,24 @@ def internal_error(error):
 # ============================================================
 
 if __name__ == "__main__":
-
-    print(
-        "--------------------------------------------"
-    )
-
-    print(
-        "OD Letter Generator"
-    )
-
-    print(
-        "--------------------------------------------"
-    )
-
-    print(
-        f"Students CSV : {STUDENTS_FILE}"
-    )
-
-    print(
-        "Students CSV exists:",
-        STUDENTS_FILE.exists()
-    )
+    print("--------------------------------------------")
+    print("OD Letter Generator")
+    print("--------------------------------------------")
+    print(f"Students CSV : {STUDENTS_FILE}")
+    print("Students CSV exists:", STUDENTS_FILE.exists())
 
     students = get_students()
 
-    print(
-        f"Students loaded: {len(students)}"
-    )
-
+    print(f"Students loaded: {len(students)}")
     print(
         f"Gemini       : "
         f"{'Configured' if client else 'Not configured'}"
     )
-
     print(
         f"ReportLab    : "
         f"{'Available' if REPORTLAB_AVAILABLE else 'Missing'}"
     )
-
-    print(
-        "--------------------------------------------"
-    )
-
+    print("--------------------------------------------")
 
     app.run(
         host="127.0.0.1",
