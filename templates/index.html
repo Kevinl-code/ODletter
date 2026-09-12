@@ -3,8 +3,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dynamic On-Duty Request Letter Generator</title>
 <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@300;400;500;600;700;800&amp;family=Poppins:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 
 <style>
 *{box-sizing:border-box}
@@ -35,7 +33,6 @@ input:focus,select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(7
 .student-picker label{display:flex;align-items:center;gap:8px;font-weight:normal;font-size:12px;margin-bottom:4px;cursor:pointer}
 @media screen and (max-width:1024px){.app-wrapper{flex-direction:column}.control-panel,.preview-panel{width:100%}}
 /* Modern Multi-Select Dropdown Styles */
-/* Modern Multi-Select Dropdown Styles */
 .dropdown-container { position: relative; width: 100%; }
 .dropdown-select-box { min-height: 42px; border: 1px solid rgba(100,116,139,.25); border-radius: 8px; background: rgba(255,255,255,.9); padding: 6px 10px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; cursor: pointer; transition: all 0.2s ease; }
 .dropdown-select-box:focus-within { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(79,70,229,.1); }
@@ -51,13 +48,13 @@ input:focus,select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(7
 .dropdown-option:hover { background: #f1f5f9; }
 .dropdown-option input[type="checkbox"] { width: auto; cursor: pointer; }
 </style>
-<script src="chrome-extension://liecbddmkiiihnedobmlmillhodjkdmb/js/recordConsoleEvents.js"></script></head>
+</head>
 <body>
 <div class="app-wrapper">
     <div class="control-panel">
         <h2>OD Letter Studio</h2>
 
-        <!-- RAG / Agentic Brochure / Invitation Extractor -->
+        <!-- AI Brochure / Invitation Extractor -->
         <div class="ai-box">
             <label style="color:#7c3aed;font-weight:700">🤖 AI Brochure / Invitation Extractor</label>
             <input type="file" id="brochure_file" accept=".pdf,.png,.jpg,.jpeg,.txt" style="margin-top:6px">
@@ -111,10 +108,9 @@ input:focus,select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(7
                     <input type="text" class="dropdown-search-input" id="student_search" placeholder="Type to search name or reg no..." oninput="filterDropdownStudents()">
                     <div id="student_checkbox_container" style="max-height: 160px; overflow-y: auto;">
                         {% for student in students %}
-                        
-                        <label class="dropdown-option student-item" data-name="{{ s.name | lower }}" data-reg="{{ s.reg_no }}">
-                            <input type="checkbox" value="{{ s.reg_no }}" data-name="{{ s.name }}" data-reg="{{ s.reg_no }}" onchange="handleStudentSelection()">
-                            <span><b>{{ s.reg_no }}</b> — {{ s.name }}</span>
+                        <label class="dropdown-option student-item" data-name="{{ student.name | lower }}" data-reg="{{ student.reg_no }}">
+                            <input type="checkbox" value="{{ student.reg_no }}" data-name="{{ student.name }}" data-reg="{{ student.reg_no }}" data-year="{{ student.year }}" data-section="{{ student.section }}" onchange="handleStudentSelection()">
+                            <span><b>{{ student.reg_no }}</b> — {{ student.name }}</span>
                         </label>
                         {% endfor %}
                     </div>
@@ -122,7 +118,7 @@ input:focus,select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(7
             </div>
         </div>
 
-        <button class="btn btn-download" onclick="downloadPDF()">Download Letter PDF</button>
+        <button class="btn btn-download" onclick="downloadPDF()">Download Letter PDF (ReportLab)</button>
     </div>
 
     <div class="preview-panel">
@@ -162,8 +158,7 @@ input:focus,select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(7
                     <td class="signature-cell">
                         <p style="margin-bottom:0">Yours faithfully,</p>
                         <strong style="margin-top:40px"><span id="view_from_name_close">Kevin Lazarus B</span></strong>
-                        
- <br> <span id="view_from_designation_close">Technical Head</span>
+                        <br><span id="view_from_designation_close">Technical Head</span>
                     </td>
                 </tr>
             </tbody></table>
@@ -228,7 +223,7 @@ function updatePreview(){
     document.getElementById("view_date_sentence").innerHTML = dateStr;
 
     // Build student rows from selected checkboxes
-    const checkboxes = document.querySelectorAll('.student-picker input[type="checkbox"]:checked');
+    const checkboxes = document.querySelectorAll('#student_checkbox_container input[type="checkbox"]:checked');
     const tbody = document.getElementById("view_student_rows");
     tbody.innerHTML = "";
 
@@ -239,7 +234,7 @@ function updatePreview(){
 
     checkboxes.forEach((cb, idx) => {
         const row = document.createElement("tr");
-        [idx + 1, cb.dataset.name, cb.dataset.reg, "II", "A"].forEach(val => {
+        [idx + 1, cb.dataset.name, cb.dataset.reg, cb.dataset.year || "II", cb.dataset.section || "A"].forEach(val => {
             const td = document.createElement("td");
             td.textContent = val;
             row.appendChild(td);
@@ -273,9 +268,8 @@ function handleStudentSelection() {
 
 function renderDropdownTags() {
     const selectBox = document.querySelector(".dropdown-select-box");
-    const checkboxes = document.querySelectorAll('.student-picker input[type="checkbox"]:checked, #student_checkbox_container input[type="checkbox"]:checked');
+    const checkboxes = document.querySelectorAll('#student_checkbox_container input[type="checkbox"]:checked');
     
-    // Clear current contents except placeholder/tags
     selectBox.innerHTML = "";
 
     if (checkboxes.length === 0) {
@@ -316,6 +310,7 @@ function filterDropdownStudents() {
         }
     });
 }
+
 async function extractBrochureDetails(){
     const fileInput = document.getElementById("brochure_file");
     if(fileInput.files.length === 0){
@@ -327,13 +322,19 @@ async function extractBrochureDetails(){
     formData.append("file", fileInput.files[0]);
 
     const btn = event.target;
+    const originalText = btn.textContent;
     btn.textContent = "Extracting with Gemini AI...";
     btn.disabled = true;
 
     try {
         const res = await fetch("/api/parse-brochure", { method: "POST", body: formData });
-        const data = await res.json();
+        const jsonRes = await res.json();
         
+        if(!jsonRes.success) {
+            throw new Error(jsonRes.error || "Extraction failed");
+        }
+
+        const data = jsonRes.data;
         if(data.event_name) document.getElementById("input_event").value = data.event_name;
         if(data.organizer) document.getElementById("input_organizer").value = data.organizer;
         if(data.from_date) document.getElementById("input_from_date").value = data.from_date;
@@ -345,18 +346,77 @@ async function extractBrochureDetails(){
     } catch(err) {
         alert("Failed to extract details: " + err.message);
     } finally {
-        btn.textContent = "Extract & Fill via Gemini";
+        btn.textContent = originalText;
         btn.disabled = false;
     }
 }
 
 async function downloadPDF(){
-    const original = document.getElementById("letter_body");
-    const canvas = await html2canvas(original, { scale: 2, useCORS: true });
-    const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
-    pdf.addImage(canvas.toDataURL("image/jpeg", 0.98), "JPEG", 0, 0, 210, 297);
-    pdf.save("On-Duty-Request-Letter.pdf");
+    const checkboxes = document.querySelectorAll('#student_checkbox_container input[type="checkbox"]:checked');
+    if(checkboxes.length === 0){
+        alert("Please select at least one student from the roster.");
+        return;
+    }
+
+    const eventName = document.getElementById("input_event").value.trim();
+    if(!eventName){
+        alert("Please enter an Event Name before downloading.");
+        document.getElementById("input_event").focus();
+        return;
+    }
+
+    const selectedStudents = Array.from(checkboxes).map(cb => ({
+        name: cb.dataset.name,
+        register_number: cb.dataset.reg,
+        year: cb.dataset.year || "II",
+        section: cb.dataset.section || "A"
+    }));
+
+    const payload = {
+        event_name: eventName,
+        organizer: document.getElementById("input_organizer").value,
+        from_date: document.getElementById("input_from_date").value,
+        to_date: document.getElementById("input_to_date").value,
+        place: document.getElementById("input_place").value,
+        from_name: document.getElementById("input_from_name").value,
+        designation: document.getElementById("input_from_class").value,
+        college: document.getElementById("input_college").value,
+        department: document.getElementById("input_dept").value,
+        students: selectedStudents
+    };
+
+    const btn = event.target;
+    const originalText = btn.textContent;
+    btn.textContent = "Generating ReportLab PDF...";
+    btn.disabled = true;
+
+    try {
+        const res = await fetch("/api/generate-pdf", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+
+        if(!res.ok){
+            const errData = await res.json();
+            throw new Error(errData.error || "Server failed to generate PDF");
+        }
+
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `OD_Letter_${eventName.replace(/[^A-Za-z0-9_-]/g, '_')}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+    } catch(err) {
+        alert("PDF Generation Error: " + err.message);
+    } finally {
+        btn.textContent = originalText;
+        btn.disabled = false;
+    }
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -368,4 +428,4 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 </script>
 
-</body><chatgpt-sidebar data-rendered="true" data-gpts-theme="light"></chatgpt-sidebar></html>
+</body></html>
