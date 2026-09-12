@@ -59,7 +59,7 @@ input:focus,select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(7
         <div class="ai-box">
             <label style="color:#7c3aed;font-weight:700">🤖 AI Brochure / Invitation Extractor</label>
             <input type="file" id="brochure_file" accept=".pdf,.png,.jpg,.jpeg,.txt" style="margin-top:6px">
-            <button type="button" class="btn btn-upload" onclick="extractBrochureDetails()">Extract &amp; Fill via Gemini</button>
+            <button type="button" class="btn btn-upload" onclick="extractBrochureDetails(event)">Extract &amp; Fill via Gemini</button>
         </div>
 
         <div class="form-group">
@@ -119,7 +119,7 @@ input:focus,select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(7
             </div>
         </div>
 
-        <button class="btn btn-download" onclick="downloadPDF()">Download Letter PDF (ReportLab)</button>
+        <button type="button" class="btn btn-download" onclick="downloadPDF(event)">Download Letter PDF (ReportLab)</button>
     </div>
 
     <div class="preview-panel">
@@ -312,7 +312,7 @@ function filterDropdownStudents() {
     });
 }
 
-async function extractBrochureDetails(){
+async function extractBrochureDetails(event){
     const fileInput = document.getElementById("brochure_file");
     if(fileInput.files.length === 0){
         alert("Please select a brochure or invitation file first.");
@@ -352,7 +352,7 @@ async function extractBrochureDetails(){
     }
 }
 
-async function downloadPDF(){
+async function downloadPDF(event){
     const checkboxes = document.querySelectorAll('#student_checkbox_container input[type="checkbox"]:checked');
     if(checkboxes.length === 0){
         alert("Please select at least one student from the roster.");
@@ -366,31 +366,6 @@ async function downloadPDF(){
         return;
     }
 
-    const btn = event.target;
-    const originalText = btn.textContent;
-    btn.textContent = "Generating Exact PDF...";
-    btn.disabled = true;
-
-    try {
-        const element = document.getElementById("letter_body");
-        const safeEventName = eventName.replace(/[^A-Za-z0-9_-]/g, '_');
-        
-        const options = {
-            margin:       0,
-            filename:     `OD_Letter_${safeEventName}.pdf`,
-            image:        { type: 'jpeg', quality: 0.98 },
-            html2canvas:  { scale: 2, useCORS: true, letterRendering: true },
-            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        };
-
-        await html2pdf().from(element).set(options).save();
-    } catch(err) {
-        alert("PDF Generation Error: " + err.message);
-    } finally {
-        btn.textContent = originalText;
-        btn.disabled = false;
-    }
-}
     const selectedStudents = Array.from(checkboxes).map(cb => ({
         name: cb.dataset.name,
         register_number: cb.dataset.reg,
